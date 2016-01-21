@@ -5,16 +5,17 @@
 
 #include <algorithm>
 #include <functional>
+#include <initializer_list>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-namespace UnitTestTool{
+namespace UnitTestTool {
 
-	namespace detail{
-		struct LineInfo{
+	namespace detail {
+		struct LineInfo {
 
 			const std::string file_;
 			const std::string func_;
@@ -25,7 +26,7 @@ namespace UnitTestTool{
 			{}
 		};
 
-		std::ostream& operator<<(std::ostream& oss, const LineInfo& lineInfo){
+		std::ostream& operator<<(std::ostream& oss, const LineInfo& lineInfo) {
 			oss << lineInfo.file_ << ":" << lineInfo.line_ << " " << lineInfo.func_;
 			return oss;
 		}
@@ -33,61 +34,148 @@ namespace UnitTestTool{
 		static std::ostream* default_oss = &std::cout;
 		static std::istream* default_iss = &std::cin;
 		static std::ostream* default_err = &std::cerr;
+		static bool verbose = false;
 
-		class TestFailure : public std::exception{
+		class TestFailure : public std::exception {
 		public:
+
 			TestFailure(std::string message) : message_(message) {}
 			virtual const char * what() const { return message_.c_str(); }
+
 		private:
+
 			const std::string message_;
 		};
 
-		void FailOnCondition(bool condition, const std::string* message = nullptr, const LineInfo* lineInfo = nullptr){
-			if (!condition){
+		void FailOnCondition(bool condition, const std::string* message = nullptr, const LineInfo* lineInfo = nullptr) {
+			if (!condition) {
 				std::ostringstream oss;
 				oss << *lineInfo << std::endl << ((message != nullptr) ? *message : "");
 				throw TestFailure(oss.str());
 			}
 		}
 
-		class Test{
+		class Test {
 		public:
-			enum Status{
-				PASSED, FAILED, ERROR, SKIPPED
+			enum Status {
+				PASSED, FAILED, ERROR, SKIPPED, NONE
 			};
 
-			Test(const std::string& label, std::function<void(void)> test)
+			Test() = delete;
+
+			Test(const std::string& label, const std::function<void(void)>& test)
 				: label_(label), status_(ERROR) {
-				try{
+				try {
 					test();
 					status_ = PASSED;
 				}
-				catch (const TestFailure& failure){
+				catch (const TestFailure& failure) {
 					status_ = FAILED;
 					failureReason_ = failure.what();
 				}
-				catch (const std::exception& e){
+				catch (const std::exception& e) {
 					status_ = ERROR;
 					error_ = e.what();
 				}
 			}
 
-		private:
+			virtual ~Test() {}
+
+			virtual const std::string& getLabel() const {
+				return label_;
+			}
+
+			virtual const std::string& getFailureReason() const {
+				return failureReason_;
+			}
+
+			virtual const std::string& getError() const {
+				return error_;
+			}
+
+			virtual Status getStatus() const {
+				return status_;
+			}
+
+		protected:
 			const std::string label_;
 			std::string failureReason_;
 			std::string error_;
 			Status status_;
 		};
 
-		class TestUnit{
+		class SkippedTest : public Test {
 		public:
 
+			SkippedTest(const std::string& label, const std::function<void(void)>& /*test*/)
+				: Test{ label, [](){} } {
+				status_ = SKIPPED;
+			}
+
+		};
+
+		class TestUnit : public Test {
+		public:
+
+			TestUnit(const std::string& label, std::initializer_list<Test> tests)
+				: Test{ label, [](){} }, tests_(tests) {
+				status_ = NONE;
+				for (auto& test : tests_){
+					switch (test.getStatus()){
+					case PASSED: testsPassed_.push_back(&test);   break;
+					case FAILED: testsFailed_.push_back(&test);   break;
+					case SKIPPED:testsSkipped_.push_back(&test);  break;
+					case ERROR:  testsWithError_.push_back(&test);break;
+					default: break;
+					}
+				}
+			}
+
+			virtual const std::string& getLabel(bool verbose) const {
+				std::ostringstream oss;
+				oss << label_ << " UNIT TEST SUMMARY:" << std::endl;
+
+				oss << "\tPASSED:" << testsPassed_.size() << "/" << tests_.size() << std::endl;
+				if (verbose){
+					for (const auto test : testsPassed_){
+						oss << "\t\t" << test->getLabel() << " PASSED" << std::endl;
+					}
+				}
+
+				oss << "\tFAILED:" << testsFailed_.size() << "/" << tests_.size() << std::endl;
+				if (verbose){
+					for (const auto test : testsFailed_){
+						oss << "\t\t" << test->getLabel() << " FAILED: " << test->getFailureReason() << std::endl;
+					}
+				}
+
+				oss << "\tSKIPPED:" << testsSkipped_.size() << "/" << tests_.size() << std::endl;
+				if (verbose){
+					for (const auto test : testsSkipped_){
+						oss << "\t\t" << test->getLabel() << " SKIPPED" << std::endl;
+					}
+				}
+
+				oss << "\tERRORS:" << testsWithError_.size() << "/" << tests_.size() << std::endl;
+				if (verbose){
+					for (const auto test : testsWithError_){
+						oss << "\t\t" << test->getLabel() << " WITH ERROR: " << test->getError() << std::endl;
+					}
+				}
+
+				return oss.str();
+			}
+
 		private:
-			std::vector<Test> testList_;
+
+			std::vector<Test> tests_;
+
+			std::vector<Test*> testsPassed_;
+			std::vector<Test*> testsFailed_;
+			std::vector<Test*> testsSkipped_;
+			std::vector<Test*> testsWithError_;
 		};
 	}
-
-
 
 
 	/*
@@ -96,12 +184,24 @@ namespace UnitTestTool{
 	*
 	*/
 
+	detail::Test test(const std::string& label, const std::function<void(void)>& test){
+		return detail::Test{ label, test };
+	}
+
+	detail::Test skip_test(const std::string& label, const std::function<void(void)>& test){
+		return detail::SkippedTest{ label, test };
+	}
+
+	void test_unit(const std::string& label, std::initializer_list<detail::Test> tests){
+		*detail::default_oss << detail::TestUnit{ label, tests }.getLabel(detail::verbose);
+	}
+
 #define LINE_INFO() detail::LineInfo(__FILE__, __FUNCTION__, __LINE__)
 
 	static void setOss(std::ostream* oss){ detail::default_oss = oss; }
 	static void setIss(std::istream* iss){ detail::default_iss = iss; }
 	static void setErr(std::ostream* err){ detail::default_err = err; }
-
+	static void setVerbose(bool verbose) { detail::verbose = verbose; }
 
 	class Assert
 	{
