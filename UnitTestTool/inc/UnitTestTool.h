@@ -73,12 +73,12 @@ namespace UnitTestTool {
 				: label_(label), status_(NONE), test_holder_(std::make_unique<test_func_t>(std::move(test)))
 			{}
 
-			//Copy not ok
+			//Copy forbidden
 
 			Test(const Test&) = delete;
 			Test& operator=(const Test&) = delete;
 
-			//Move ok
+			//Move allowed
 
 			Test(Test&& test)
 				: test_holder_(std::make_unique<test_func_t>(std::move(*test.test_holder_))),
@@ -171,8 +171,6 @@ namespace UnitTestTool {
 
 			UnitTest(const std::string& unit_label, std::vector<std::unique_ptr<Test>>&& tests)
 				: Test{ unit_label }, tests_(std::move(tests)) {
-
-
 			}
 
 		private:
@@ -186,7 +184,7 @@ namespace UnitTestTool {
 					case FAILED: testsFailed_.push_back(test.get());   break;
 					case SKIPPED:testsSkipped_.push_back(test.get());  break;
 					case ERROR:  testsWithError_.push_back(test.get()); break;
-					case UNIT:   
+					case UNIT:   *default_err << "nested unit test not implemented yet" << std::endl; break;
 					default: break;
 					}
 				}
@@ -196,28 +194,28 @@ namespace UnitTestTool {
 				std::ostringstream oss;
 				oss << label_ << " UNIT TEST SUMMARY:" << std::endl;
 
-				oss << "\tPASSED:" << testsPassed_.size() << "/" << tests_.size() << std::endl;
+				oss << "\tPASSED:" << getPassedCount() << "/" << tests_.size() << std::endl;
 				if (verbose){
 					for (const auto test : testsPassed_){
 						oss << "\t\t" << test->getLabel(verbose) << " PASSED" << std::endl;
 					}
 				}
 
-				oss << "\tFAILED:" << testsFailed_.size() << "/" << tests_.size() << std::endl;
+				oss << "\tFAILED:" << getFailedCount() << "/" << tests_.size() << std::endl;
 				if (verbose){
 					for (const auto test : testsFailed_){
 						oss << "\t\t" << test->getLabel(verbose) << " FAILED: " << test->getFailureReason() << std::endl;
 					}
 				}
 
-				oss << "\tSKIPPED:" << testsSkipped_.size() << "/" << tests_.size() << std::endl;
+				oss << "\tSKIPPED:" << getSkippedCount() << "/" << tests_.size() << std::endl;
 				if (verbose){
 					for (const auto test : testsSkipped_){
 						oss << "\t\t" << test->getLabel(verbose) << " SKIPPED" << std::endl;
 					}
 				}
 
-				oss << "\tERRORS:" << testsWithError_.size() << "/" << tests_.size() << std::endl;
+				oss << "\tERRORS:" << getErrorCount() << "/" << tests_.size() << std::endl;
 				if (verbose){
 					for (const auto test : testsWithError_){
 						oss << "\t\t" << test->getLabel(verbose) << " WITH ERROR: " << test->getError() << std::endl;
@@ -241,6 +239,9 @@ namespace UnitTestTool {
 			std::vector<Test*> testsSkipped_;
 			std::vector<Test*> testsWithError_;
 		};
+
+
+		static std::vector<test_ptr> tests_list{};
 	}
 
 
@@ -264,7 +265,15 @@ namespace UnitTestTool {
 	test_ptr unit_test(const std::string& label, std::vector<test_ptr>&& tests){ return std::make_unique<unit_test_t>(label, std::move(tests)); }
 
 
+	void register_unit_test(test_ptr&& unit_test){ detail::tests_list.push_back(std::move(unit_test)); }
+#define REGISTER_UNIT_TEST(unit_test_name) register_unit_test(UserTestCase # unit_test_name{});
+	void run_tests() { for (auto&& test : detail::tests_list) test->run(); }
+	void display_results() { for (auto&& test : detail::tests_list) *detail::default_oss << test->getLabel(); }
+	void display_results_err() { for (auto&& test : detail::tests_list) *detail::default_err << test->getLabel(); }
+	void run_and_display() { run_tests(); display_results(); }
+
 #define LINE_INFO() detail::LineInfo(__FILE__, __FUNCTION__, __LINE__)
+#define TEST_CASE(unit_test_name, content) class UserTestCase_ # unit_test_name : public detail::UnitTest { UserTestCase # unit_test_name() : detail::UnitTest{unit_test_name, content} {} };
 
 	static void setOss(std::ostream* oss){ detail::default_oss = oss; }
 	static void setIss(std::istream* iss){ detail::default_iss = iss; }
