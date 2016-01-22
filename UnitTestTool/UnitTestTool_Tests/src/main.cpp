@@ -15,15 +15,45 @@ public:
 };
 
 using namespace UnitTestTool;
-TEST_CASE(Test_class_A {
-		[](){
-			Assert::AreEqual(A::add(1, 2), 3, "1+2 != 3 !!!!" LINE_INFO());
-		}
-	})
 
+
+/*
+register_test("Test", [](){
+const std::string str = "1 + 2 = 3 !";
+})
+*/
+/*
+register_tests("Test", {
+	make_test([](){
+		const std::string str = "1 + 2 = 3 !";
+		Assert::Fail(":'(", LINE_INFO());
+	}),
+		make_test([](){
+		const bool b = true;
+		Assert::IsTrue(b);
+	})
+}})
+*/
+
+
+static UnitTestTool::detail::UnitTestTool_registrar UnitTestTool_registrar(
+	UnitTestTool::unit_test("Test", {
+		make_test("hahah", [](){
+			const std::string str = "1 + 2 = 3 !";
+			Assert::Fail(":'(", LINE_INFO());
+		}),
+		make_test("hohoho", [](){
+			const bool b = true;
+			Assert::IsTrue(b);
+		})
+	}
+));
 
 
 int main(int /*argc*/, char* /*argv[]*/){
 
-	//std::cout << "Hello world !" << std::endl;
+		UnitTestTool::run_and_display(true);
+
+		system("PAUSE");
+		//std::cout << "Hello world !" << std::endl;
 }

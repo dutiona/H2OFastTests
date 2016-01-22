@@ -50,13 +50,20 @@ namespace UnitTestTool {
 			const std::string message_;
 		};
 
-		void FailOnCondition(bool condition, const std::string* message = nullptr, const LineInfo* lineInfo = nullptr) {
+		void FailOnCondition(bool condition, const char* message = nullptr, const LineInfo* lineInfo = nullptr) {
 			if (!condition) {
 				std::ostringstream oss;
-				oss << *lineInfo << std::endl << ((message != nullptr) ? *message : "");
+				if (lineInfo != nullptr){
+					oss << *lineInfo << std::endl << ((message != nullptr) ? message : "");
+				}
+				else{
+					oss << ((message != nullptr) ? message : "");
+				}
 				throw TestFailure(oss.str());
 			}
 		}
+
+		using test_func_t = std::function<void(void)>;
 
 		class Test {
 		public:
@@ -65,9 +72,8 @@ namespace UnitTestTool {
 				PASSED, FAILED, ERROR, SKIPPED, UNIT, NONE
 			};
 
-			using test_func_t = std::function<void(void)>;
-
 			Test() : Test({}, [](){}) {}
+			Test(const test_func_t&& test) : Test("", std::move(test)) {}
 			Test(const std::string& label) : Test(label, [](){}) {}
 			Test(const std::string& label, const test_func_t&& test)
 				: label_(label), status_(NONE), test_holder_(std::make_unique<test_func_t>(std::move(test)))
@@ -99,10 +105,10 @@ namespace UnitTestTool {
 
 			void run() { run_private(); }
 
-			const std::string& getLabel(bool verbose) const { return getLabel_private(verbose); }
-			const std::string& getFailureReason() const { return getFailureReason_private(); }
-			const std::string& getSkippedReason() const { return getSkippedReason_private(); }
-			const std::string& getError() const { return getError_private(); }
+			const std::string getLabel(bool verbose) const { return getLabel_private(verbose); }
+			const std::string getFailureReason() const { return getFailureReason_private(); }
+			const std::string getSkippedReason() const { return getSkippedReason_private(); }
+			const std::string getError() const { return getError_private(); }
 			Status getStatus() const { return getStatus_private(); }
 
 			size_t getPassedCount() const { return getPassedCount_private(); }
@@ -129,10 +135,10 @@ namespace UnitTestTool {
 				}
 			}
 
-			virtual const std::string& getLabel_private(bool /*verbose*/) const { return label_; }
-			virtual const std::string& getFailureReason_private() const { return failure_reason_; }
-			virtual const std::string& getSkippedReason_private() const { return skipped_reason_; }
-			virtual const std::string& getError_private() const { return error_; }
+			virtual const std::string getLabel_private(bool /*verbose*/) const { return label_; }
+			virtual const std::string getFailureReason_private() const { return failure_reason_; }
+			virtual const std::string getSkippedReason_private() const { return skipped_reason_; }
+			virtual const std::string getError_private() const { return error_; }
 			virtual Status getStatus_private() const { return status_; }
 
 			virtual size_t getPassedCount_private() const { return static_cast<size_t>(status_ == PASSED); }
@@ -151,6 +157,8 @@ namespace UnitTestTool {
 
 		};
 
+		using test_t = detail::Test;
+
 		class SkippedTest : public Test {
 		public:
 
@@ -166,18 +174,30 @@ namespace UnitTestTool {
 
 		};
 
+		using skipped_test_t = detail::SkippedTest;
+
 		class UnitTest : public Test {
 		public:
 
-			UnitTest(const std::string& unit_label, std::vector<std::unique_ptr<Test>>&& tests)
-				: Test{ unit_label }, tests_(std::move(tests)) {
+			UnitTest(std::vector<test_t>&& tests)
+				: Test{ }, tests_({}) {
+				std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [this](test_t&& test){
+					tests_.push_back(std::move(std::make_unique<test_t>(std::move(test))));
+				});
+			}
+
+			UnitTest(const std::string& unit_label, std::vector<test_t>&& tests)
+				: Test{ unit_label }, tests_({}) {
+				std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [this](test_t&& test){
+					tests_.push_back(std::make_unique<test_t>(std::move(test)));
+				});
 			}
 
 		private:
 
 			virtual void run_private() {
 				status_ = UNIT;
-				for (auto& test : tests_) {
+				for (auto&& test : tests_) {
 					test->run();
 					switch (test->getStatus()) {
 					case PASSED: testsPassed_.push_back(test.get());   break;
@@ -190,7 +210,7 @@ namespace UnitTestTool {
 				}
 			}
 
-			virtual const std::string& getLabel_private(bool verbose) const {
+			virtual const std::string getLabel_private(bool verbose) const {
 				std::ostringstream oss;
 				oss << label_ << " UNIT TEST SUMMARY:" << std::endl;
 
@@ -232,7 +252,7 @@ namespace UnitTestTool {
 
 		private:
 
-			std::vector<std::unique_ptr<Test>> tests_;
+			std::vector<std::unique_ptr<test_t>> tests_;
 
 			std::vector<Test*> testsPassed_;
 			std::vector<Test*> testsFailed_;
@@ -240,8 +260,18 @@ namespace UnitTestTool {
 			std::vector<Test*> testsWithError_;
 		};
 
+		using unit_test_t = detail::UnitTest;
 
-		static std::vector<test_ptr> tests_list{};
+		std::vector<test_t>& registry() {
+			static std::vector<test_t> tests_list{};
+			return tests_list;
+		};
+
+		struct UnitTestTool_registrar {
+			UnitTestTool_registrar(test_t&& func)	{
+				registry().push_back(std::move(func));
+			}
+		};
 	}
 
 
@@ -251,34 +281,69 @@ namespace UnitTestTool {
 	*
 	*/
 
-	using test_t = detail::Test;
-	using unit_test_t = detail::UnitTest;
-	using skipped_test_t = detail::SkippedTest;
-	using test_ptr = std::unique_ptr<test_t>;
-	using test_func_t = test_t::test_func_t;
-	
-	test_ptr make_test(const std::string& label, test_func_t&& test){ return std::make_unique<test_t>(label, std::move(test)); }
-	test_ptr skip_test(test_ptr&& test){ return std::make_unique<skipped_test_t>(std::move(*test)); }
-	test_ptr skip_test(test_t&& test){ return std::make_unique<skipped_test_t>(std::move(test)); }
-	test_ptr skip_test(const std::string& label, test_ptr&& test){ return std::make_unique<skipped_test_t>(label, std::move(*test)); }
-	test_ptr skip_test(const std::string& label, test_t&& test){ return std::make_unique<skipped_test_t>(label, std::move(test)); }
-	test_ptr unit_test(const std::string& label, std::vector<test_ptr>&& tests){ return std::make_unique<unit_test_t>(label, std::move(tests)); }
-
-
-	void register_unit_test(test_ptr&& unit_test){ detail::tests_list.push_back(std::move(unit_test)); }
-#define REGISTER_UNIT_TEST(unit_test_name) register_unit_test(UserTestCase # unit_test_name{});
-	void run_tests() { for (auto&& test : detail::tests_list) test->run(); }
-	void display_results() { for (auto&& test : detail::tests_list) *detail::default_oss << test->getLabel(); }
-	void display_results_err() { for (auto&& test : detail::tests_list) *detail::default_err << test->getLabel(); }
-	void run_and_display() { run_tests(); display_results(); }
-
-#define LINE_INFO() detail::LineInfo(__FILE__, __FUNCTION__, __LINE__)
-#define TEST_CASE(unit_test_name, content) class UserTestCase_ # unit_test_name : public detail::UnitTest { UserTestCase # unit_test_name() : detail::UnitTest{unit_test_name, content} {} };
-
 	static void setOss(std::ostream* oss){ detail::default_oss = oss; }
 	static void setIss(std::istream* iss){ detail::default_iss = iss; }
 	static void setErr(std::ostream* err){ detail::default_err = err; }
 	static void setVerbose(bool verbose) { detail::verbose = verbose; }
+
+	using test_t = detail::test_t;
+	using unit_test_t = detail::unit_test_t;
+	using skipped_test_t = detail::skipped_test_t;
+	//using test_ptr = detail::test_ptr;
+	using test_func_t = detail::test_func_t;
+	
+	//test_ptr&& make_test(test_func_t&& func){ return std::make_unique<test_t>(std::move(func)); }
+	test_t&& make_test(const std::string& label, test_func_t&& func){ return std::move(test_t(label, std::move(func))); }
+	test_t&& skip_test(test_t&& test){ return std::move(skipped_test_t(std::move(test))); }
+	test_t&& skip_test(const std::string& reason, test_t&& test){ return std::move(skipped_test_t(reason, std::move(test))); }
+	template<typename ... Args>
+	test_t&& unit_test(Args ... args){ return std::move(unit_test_t(std::move(tests))); }
+	test_t&& unit_test(const std::string& label, std::vector<test_t>&& tests){ return std::move(unit_test_t(label, std::move(tests))); }
+	/*
+	test_ptr unit_test(const std::string& label, std::vector<test_t>&& tests){
+		auto&& tests_ptr = std::vector<test_ptr>{};
+		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_t&& test){
+			tests_ptr.push_back(std::make_unique<test_t>(std::move(test)));
+		});
+		return std::make_unique<unit_test_t>(label, std::move(tests_ptr));
+	}
+	test_ptr unit_test(std::vector<test_t>&& tests){
+		auto&& tests_ptr = std::vector<test_ptr>{};
+		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_t&& test){
+			tests_ptr.push_back(std::make_unique<test_t>(std::move(test)));
+		});
+		return std::make_unique<unit_test_t>(std::move(tests_ptr));
+	}
+	*/
+	/*
+	test_ptr unit_test(const std::string& label, std::vector<test_func_t>&& tests){
+		auto tests_ptr = std::vector<test_ptr>{};
+		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_func_t&& test){
+			tests_ptr.push_back(make_test(std::move(test)));
+		});
+		return std::make_unique<unit_test_t>(label, std::move(tests_ptr));
+	}
+	test_ptr unit_test(std::vector<test_func_t>&& tests){
+		auto tests_ptr = std::vector<test_ptr>{};
+		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_func_t&& test){
+			tests_ptr.push_back(make_test(std::move(test)));
+		});
+		return std::make_unique<unit_test_t>(std::move(tests_ptr));
+	}
+	*/
+
+#define register_test(label, unit_test_func) \
+	static UnitTestTool::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::make_test(label, unit_test_func));
+	
+#define register_tests(label, unit_test_func_list) \
+	static UnitTestTool::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::unit_test(label, std::move(unit_test_func_list)));
+
+	void run_tests() { for (auto&& test : detail::registry()) test.run(); }
+	void display_results(bool verbose = false) { for (auto&& test : detail::registry()) *detail::default_oss << test.getLabel(verbose); }
+	void display_results_err(bool verbose = false) { for (auto&& test : detail::registry()) *detail::default_err << test.getLabel(verbose); }
+	void run_and_display(bool verbose = false) { run_tests(); display_results(verbose); }
+
+#define LINE_INFO() &UnitTestTool::detail::LineInfo(__FILE__, "", __LINE__)
 
 	class Assert
 	{
@@ -287,33 +352,33 @@ namespace UnitTestTool {
 		// Verify that two objects are equal.
 		template<typename T>
 		static void AreEqual(const T& expected, const T& actual,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(expected == actual, message, lineInfo);
 		}
 
 		// double equality comparison:
 		static void AreEqual(double expected, double actual, double tolerance,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			double diff = expected - actual;
 			FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
 		}
 
 		// float equality comparison:
 		static void AreEqual(float expected, float actual, float tolerance,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			float diff = expected - actual;
 			FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
 		}
 
 		// char* string equality comparison:
 		static void AreEqual(const char* expected, const char* actual, bool ignoreCase = false,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			AreEqual(std::string{ expected }, std::string{ actual }, ignoreCase, message, lineInfo);
 		}
 
 		// char* string equality comparison:
 		static void AreEqual(std::string expected, std::string actual, bool ignoreCase = false,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			if (ignoreCase){
 				std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
 				std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
@@ -324,39 +389,39 @@ namespace UnitTestTool {
 		// Verify that two references refer to the same object instance (identity):
 		template<typename T>
 		static void AreSame(const T& expected, const T& actual,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(&expected == &actual, message, lineInfo);
 		}
 
 		// Generic AreNotEqual comparison:
 		template<typename T> static void AreNotEqual(const T& notExpected, const T& actual,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(!(notExpected == actual), message, lineInfo);
 		}
 
 		// double AreNotEqual comparison:
 		static void AreNotEqual(double notExpected, double actual, double tolerance,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			double diff = notExpected - actual;
 			FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
 		}
 
 		// float AreNotEqual comparison:
 		static void AreNotEqual(float notExpected, float actual, float tolerance,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			float diff = notExpected - actual;
 			FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
 		}
 
 		// char* string AreNotEqual comparison:
 		static void AreNotEqual(const char* notExpected, const char* actual, bool ignoreCase = false,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			AreNotEqual(std::string{ notExpected }, std::string{ actual }, ignoreCase, message, lineInfo);
 		}
 
 		// wchar_t* string AreNotEqual comparison with char* message:
 		static void AreNotEqual(std::string notExpected, std::string actual, bool ignoreCase = false,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			if (ignoreCase){
 				std::transform(notExpected.begin(), notExpected.end(), notExpected.begin(), ::tolower);
 				std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
@@ -368,36 +433,36 @@ namespace UnitTestTool {
 		// Verify that two references do not refer to the same object instance (identity):
 		template<typename T>
 		static void AreNotSame(const T& notExpected, const T& actual,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(!(&notExpected == &actual), message, lineInfo);
 		}
 
 		// Verify that a pointer is NULL:
 		template<typename T> static void IsNull(const T* actual,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(actual == nullptr, message, lineInfo);
 		}
 
 		// Verify that a pointer is not NULL:
 		template<typename T> static void IsNotNull(const T* actual,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(actual != nullptr, message, lineInfo);
 		}
 
 		// Verify that a condition is true:
 		static void IsTrue(bool condition,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(condition, message, lineInfo);
 		}
 
 		// Verify that a conditon is false:
 		static void IsFalse(bool condition,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(!condition, message, lineInfo);
 		}
 
 		// Force the test case result to be Failed:
-		static void Fail(const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+		static void Fail(const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			FailOnCondition(false, message, lineInfo);
 		}
 
@@ -405,7 +470,7 @@ namespace UnitTestTool {
 		// Verify that a function raises an exception:
 		template<typename ExpectedException, typename Functor>
 		static void ExpectException(Functor functor,
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			try{
 				functor();
 			}
@@ -419,7 +484,7 @@ namespace UnitTestTool {
 
 		template<typename ExpectedException, typename ReturnType>
 		static void ExpectException(ReturnType(*func)(),
-			const std::string* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
 			Assert::IsNotNull(func, message, lineInfo);
 
 			try{
