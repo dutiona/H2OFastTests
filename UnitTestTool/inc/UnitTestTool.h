@@ -76,27 +76,22 @@ namespace UnitTestTool {
 			Test(const test_func_t&& test) : Test("", std::move(test)) {}
 			Test(const std::string& label) : Test(label, [](){}) {}
 			Test(const std::string& label, const test_func_t&& test)
-				: label_(label), status_(NONE), test_holder_(std::make_unique<test_func_t>(std::move(test)))
+				: label_(label), status_(NONE), test_holder_(std::make_shared<test_func_t>(std::move(test)))
 			{}
 
-			//Copy forbidden
-
-			Test(const Test&) = delete;
-			Test& operator=(const Test&) = delete;
-
 			//Move allowed
-
 			Test(Test&& test)
-				: test_holder_(std::make_unique<test_func_t>(std::move(*test.test_holder_))),
+				: test_holder_(test.test_holder_),
 				label_(test.label_), status_(test.status_),
 				failure_reason_(test.failure_reason_), error_(test.error_)
 			{}
 			Test&& operator=(Test&& test) {
-				test_holder_ = std::make_unique<test_func_t>(std::move(*test.test_holder_));
+				test_holder_ = test.test_holder_;
 				label_ = test.label_;
 				status_ = test.status_;
 				failure_reason_ = test.failure_reason_;
 				error_ = test.error_;
+				return std::move(*this);
 			}
 
 			virtual ~Test() {}
@@ -148,7 +143,7 @@ namespace UnitTestTool {
 
 		protected:
 
-			std::unique_ptr<test_func_t> test_holder_;
+			std::shared_ptr<test_func_t> test_holder_;
 			std::string label_;
 			std::string failure_reason_;
 			std::string skipped_reason_;
@@ -180,16 +175,16 @@ namespace UnitTestTool {
 		public:
 
 			UnitTest(std::vector<test_t>&& tests)
-				: Test{ }, tests_({}) {
+				: Test{ } {
 				std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [this](test_t&& test){
-					tests_.push_back(std::move(std::make_unique<test_t>(std::move(test))));
+					tests_.push_back(std::move(std::make_shared<test_t>(std::move(test))));
 				});
 			}
 
 			UnitTest(const std::string& unit_label, std::vector<test_t>&& tests)
-				: Test{ unit_label }, tests_({}) {
+				: Test{ unit_label } {
 				std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [this](test_t&& test){
-					tests_.push_back(std::make_unique<test_t>(std::move(test)));
+					tests_.push_back(std::make_shared<test_t>(std::move(test)));
 				});
 			}
 
@@ -252,7 +247,7 @@ namespace UnitTestTool {
 
 		private:
 
-			std::vector<std::unique_ptr<test_t>> tests_;
+			std::vector<std::shared_ptr<test_t>> tests_;
 
 			std::vector<Test*> testsPassed_;
 			std::vector<Test*> testsFailed_;
@@ -293,12 +288,12 @@ namespace UnitTestTool {
 	using test_func_t = detail::test_func_t;
 	
 	//test_ptr&& make_test(test_func_t&& func){ return std::make_unique<test_t>(std::move(func)); }
-	test_t&& make_test(const std::string& label, test_func_t&& func){ return std::move(test_t(label, std::move(func))); }
+	test_t&& make_test(std::string label, test_func_t&& func){ return std::move(test_t(label, std::move(func))); }
 	test_t&& skip_test(test_t&& test){ return std::move(skipped_test_t(std::move(test))); }
-	test_t&& skip_test(const std::string& reason, test_t&& test){ return std::move(skipped_test_t(reason, std::move(test))); }
+	test_t&& skip_test(std::string reason, test_t&& test){ return std::move(skipped_test_t(reason, std::move(test))); }
 	template<typename ... Args>
 	test_t&& unit_test(Args ... args){ return std::move(unit_test_t(std::move(tests))); }
-	test_t&& unit_test(const std::string& label, std::vector<test_t>&& tests){ return std::move(unit_test_t(label, std::move(tests))); }
+	test_t&& unit_test(std::string label, std::vector<test_t>&& tests){ return std::move(unit_test_t(label, std::move(tests))); }
 	/*
 	test_ptr unit_test(const std::string& label, std::vector<test_t>&& tests){
 		auto&& tests_ptr = std::vector<test_ptr>{};
