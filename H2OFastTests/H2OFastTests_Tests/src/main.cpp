@@ -22,6 +22,8 @@ register_scenario(TEST1, "Test 1",
 );
 
 
+register_scenario(TEST2, "youhou", describe_test([](){}));
+
 int main(int /*argc*/, char* /*argv[]*/){
 
 	

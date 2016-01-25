@@ -157,23 +157,25 @@ namespace H2OFastTests {
 		std::shared_ptr<test_t> skip_test(test_t&& test) { return std::make_shared<skipped_test_t>(std::move(test)); }
 		std::shared_ptr<test_t> skip_test(const std::string& reason, test_t&& test) { return std::make_shared<skipped_test_t>(reason, std::move(test)); }
 
+		using registry_storage_t = std::vector<std::shared_ptr<test_t>>;
+
 		// Registry main impl
 		class Registry {
 		public:
-			using registry_storage_t = std::vector<std::shared_ptr<test_t>>;
-			Registry(const std::string& label) : label_(label) {}
-			registry_storage_t& get() {	static registry_storage_t tests_list{};	return tests_list; };
+			Registry(const std::string& label, registry_storage_t* tests_list) : label_(label), tests_list_(tests_list) {}
+			registry_storage_t& get() {	return *tests_list_; };
 			const registry_storage_t& get() const { return const_cast<Registry*>(this)->get(); };
 			const std::string& getLabel() const { return label_; }
 		private:
 			std::string label_;
+			registry_storage_t* tests_list_;
 		};
 
 		//Building a registry and filling it in a static context
 		class RegistryManager {
 		public:
-			RegistryManager(const std::string& label, std::initializer_list<std::shared_ptr<test_t>> tests)
-				: registry_(label) {
+			RegistryManager(const std::string& label, registry_storage_t* tests_list, std::initializer_list<std::shared_ptr<test_t>> tests)
+				: run_(false), registry_(label, tests_list) {
 				for (auto& test : tests)
 					push_back(test);
 			}
@@ -197,25 +199,27 @@ namespace H2OFastTests {
 					default: break;
 					}
 				}
+				run_ = true;
 			}
 
-			size_t getPassedCount() const { return testsPassed_.size(); }
+			size_t getPassedCount() const { return run_ ? testsPassed_.size() : 0; }
 			const std::vector<const test_t*>& getPassedTests() const { return testsPassed_; }
 
-			size_t getFailedCount() const { return testsFailed_.size(); }
+			size_t getFailedCount() const { return run_ ? testsFailed_.size() : 0; }
 			const std::vector<const test_t*>& getFailedTests() const { return testsFailed_; }
 
-			size_t getSkippedCount() const { return testsSkipped_.size(); }
+			size_t getSkippedCount() const { return run_ ? testsSkipped_.size() : 0; }
 			const std::vector<const test_t*>& getSkippedTests() const { return testsSkipped_; }
 
-			size_t getWithErrorCount() const { return testsWithError_.size(); }
+			size_t getWithErrorCount() const { return run_ ? testsWithError_.size() : 0; }
 			const std::vector<const test_t*>& getWithErrorTests() const { return testsWithError_; }
 
-			size_t getAllTestsCount() const { return get()->get().size(); }
-			const Registry::registry_storage_t& getAllTests() const { return get()->get(); }
+			size_t getAllTestsCount() const { return run_ ? get()->get().size() : 0; }
+			const registry_storage_t& getAllTests() const { return get()->get(); }
 
 		private:
 
+			bool run_;
 			Registry registry_;
 			std::vector<const test_t*> testsPassed_;
 			std::vector<const test_t*> testsFailed_;
@@ -372,7 +376,6 @@ namespace H2OFastTests {
 			detail::FailOnCondition(notExpected != actual, message, lineInfo);
 		}
 
-
 		// Verify that two references do not refer to the same object instance (identity):
 		template<typename T>
 		static void AreNotSame(const T& notExpected, const T& actual,
@@ -409,7 +412,6 @@ namespace H2OFastTests {
 			detail::FailOnCondition(false, message, lineInfo);
 		}
 
-
 		// Verify that a function raises an exception:
 		template<typename ExpectedException, typename Functor>
 		static void ExpectException(Functor functor,
@@ -445,7 +447,8 @@ namespace H2OFastTests {
 
 //Helper macros to use the unit test suit
 #define register_scenario(name, description, ...) \
-	static H2OFastTests::detail::RegistryManager registry_manager_ ## name {description, { __VA_ARGS__ } };
+	static H2OFastTests::detail::registry_storage_t tests_list_ ## name; \
+	static H2OFastTests::detail::RegistryManager registry_manager_ ## name {description, &tests_list_ ## name, { __VA_ARGS__ } };
 #define describe_test(test) H2OFastTests::detail::make_test((test))
 #define describe_test_label(description, test) H2OFastTests::detail::make_test(description, (test))
 #define run_scenario(name) registry_manager_ ## name.run_tests();
