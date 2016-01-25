@@ -18,11 +18,9 @@ namespace H2OFastTests {
 
 	namespace detail {
 		struct LineInfo {
-
 			const std::string file_;
 			const std::string func_;
 			const int line_;
-
 			LineInfo(const char* file, const char* func, int line)
 				: file_(file), func_(func), line_(line)
 			{}
@@ -33,29 +31,21 @@ namespace H2OFastTests {
 			return oss;
 		}
 
-		static std::ostream* default_oss = &std::cout;
-		static std::istream* default_iss = &std::cin;
-		static std::ostream* default_err = &std::cerr;
-		static bool verbose = false;
-
 		class TestFailure : public std::exception {
 		public:
-
 			TestFailure(std::string message) : message_(message) {}
 			virtual const char * what() const { return message_.c_str(); }
-
 		private:
-
 			const std::string message_;
 		};
 
 		void FailOnCondition(bool condition, const char* message = nullptr, const LineInfo* lineInfo = nullptr) {
 			if (!condition) {
 				std::ostringstream oss;
-				if (lineInfo != nullptr){
+				if (lineInfo != nullptr) {
 					oss << *lineInfo << std::endl << ((message != nullptr) ? message : "");
 				}
-				else{
+				else {
 					oss << ((message != nullptr) ? message : "");
 				}
 				throw TestFailure(oss.str());
@@ -75,27 +65,24 @@ namespace H2OFastTests {
 			Test(const test_func_t&& test) : Test("", std::move(test)) {}
 			Test(const std::string& label) : Test(label, [](){}) {}
 			Test(const std::string& label, const test_func_t&& test)
-				: label_(label), status_(NONE), test_holder_(std::make_unique<test_func_t>(std::move(test)))
+				: label_(label), status_(NONE), test_holder_(std::make_shared<test_func_t>(std::move(test)))
 			{}
 
-			//Copy forbidden
-
-			Test(const Test&) = delete;
-			Test& operator=(const Test&) = delete;
-
-			//Move allowed
+			// Default move impl for VC2013
 
 			Test(Test&& test)
-				: test_holder_(std::make_unique<test_func_t>(std::move(*test.test_holder_))),
+				: test_holder_(std::make_shared<test_func_t>(std::move(*test.test_holder_))),
 				label_(test.label_), status_(test.status_),
 				failure_reason_(test.failure_reason_), error_(test.error_)
 			{}
+
 			Test&& operator=(Test&& test) {
-				test_holder_ = std::make_unique<test_func_t>(std::move(*test.test_holder_));
+				test_holder_ = std::make_shared<test_func_t>(std::move(*test.test_holder_));
 				label_ = test.label_;
 				status_ = test.status_;
 				failure_reason_ = test.failure_reason_;
 				error_ = test.error_;
+				return std::move(*this);
 			}
 
 			virtual ~Test() {}
@@ -114,7 +101,7 @@ namespace H2OFastTests {
 
 			virtual void run_private() {
 				try {
-					(*test_holder_)(); // Effective test call
+					(*test_holder_)(); /* /!\ Here is the test call /!\ */
 					status_ = PASSED;
 				}
 				catch (const TestFailure& failure) {
@@ -135,7 +122,7 @@ namespace H2OFastTests {
 
 		protected:
 
-			std::unique_ptr<test_func_t> test_holder_;
+			std::shared_ptr<test_func_t> test_holder_;
 			std::string label_;
 			std::string failure_reason_;
 			std::string skipped_reason_;
@@ -163,49 +150,52 @@ namespace H2OFastTests {
 
 		using skipped_test_t = detail::SkippedTest;
 
-		class Registry{
+		// Helper functions to build/skip a test case
+		std::shared_ptr<test_t> make_test(test_func_t&& func) { return std::make_shared<test_t>(std::move(func)); }
+		std::shared_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return std::make_shared<test_t>(label, std::move(func)); }
+		std::shared_ptr<test_t> skip_test(test_t&& test) { return std::make_shared<skipped_test_t>(std::move(test)); }
+		std::shared_ptr<test_t> skip_test(const std::string& reason, test_t&& test) { return std::make_shared<skipped_test_t>(reason, std::move(test)); }
+
+		// Registry main impl
+		class Registry {
 		public:
-			using registry_storage_t = std::vector<test_t>;
+			using registry_storage_t = std::vector<std::shared_ptr<test_t>>;
 			Registry(const std::string& label) : label_(label) {}
-			registry_storage_t& get() {
-				static registry_storage_t tests_list{};
-				return tests_list;
-			};
-			const registry_storage_t& get() const {
-				return const_cast<Registry*>(this)->get();
-			};
-			const std::string& getLabel() const{
-				return label_;
-			}
+			registry_storage_t& get() {	static registry_storage_t tests_list{};	return tests_list; };
+			const registry_storage_t& get() const { return const_cast<Registry*>(this)->get(); };
+			const std::string& getLabel() const { return label_; }
 		private:
 			std::string label_;
 		};
 
+		//Building a registry and filling it in a static context
 		class RegistryManager {
 		public:
-			RegistryManager(const std::string& label) : registry_(label) {}
-			void push_back(test_t&& func) {
-				registry_.get().push_back(std::move(func));
+
+			RegistryManager(const std::string& label, test_func_t&& tests...)
+				: registry_(label) {
+				push_back(make_test(std::move(tests)));
 			}
-			Registry* get() {
-				return &registry_;
-			}
-			const Registry* get() const {
-				return &registry_;
-			}
+
+			void push_back(std::shared_ptr<test_t>&& func) { registry_.get().push_back(std::move(func)); }
+
+			Registry* get() { return &registry_; }
+			const Registry* get() const { return &registry_; }
+
 			void run_tests() {
 				auto tests = registry_.get();
 				for (auto&& test : tests) {
-					test.run();
-					switch (test.getStatus()) {
-					case test_t::PASSED: testsPassed_.push_back(&test);   break;
-					case test_t::FAILED: testsFailed_.push_back(&test);   break;
-					case test_t::SKIPPED:testsSkipped_.push_back(&test);  break;
-					case test_t::ERROR:  testsWithError_.push_back(&test); break;
+					test->run();
+					switch (test->getStatus()) {
+					case test_t::PASSED: testsPassed_.push_back(test.get());   break;
+					case test_t::FAILED: testsFailed_.push_back(test.get());   break;
+					case test_t::SKIPPED:testsSkipped_.push_back(test.get());  break;
+					case test_t::ERROR:  testsWithError_.push_back(test.get());break;
 					default: break;
 					}
 				}
 			}
+
 			size_t getPassedCount() const { return testsPassed_.size(); }
 			const std::vector<const test_t*>& getPassedTests() const { return testsPassed_; }
 
@@ -220,54 +210,15 @@ namespace H2OFastTests {
 
 			size_t getAllTestsCount() const { return get()->get().size(); }
 			const Registry::registry_storage_t& getAllTests() const { return get()->get(); }
-		private:
-			Registry registry_;
 
+		private:
+
+			Registry registry_;
 			std::vector<const test_t*> testsPassed_;
 			std::vector<const test_t*> testsFailed_;
 			std::vector<const test_t*> testsSkipped_;
 			std::vector<const test_t*> testsWithError_;
-		};
 
-		class Registry_Traversal{
-		public:
-
-			Registry_Traversal(RegistryManager& registry) : registry_(registry) {}
-
-			std::ostream& printResult(std::ostream& oss) const {
-				oss << registry_.get()->getLabel() << " UNIT TEST SUMMARY:" << std::endl;
-
-				oss << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
-				if (verbose){
-					for (const auto test : registry_.getPassedTests()){
-						oss << "\t\t" << test->getLabel(verbose) << " PASSED" << std::endl;
-					}
-				}
-
-				oss << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
-				if (verbose){
-					for (const auto test : registry_.getFailedTests()){
-						oss << "\t\t" << test->getLabel(verbose) << " FAILED: " << test->getFailureReason() << std::endl;
-					}
-				}
-
-				oss << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
-				if (verbose){
-					for (const auto test : registry_.getSkippedTests()){
-						oss << "\t\t" << test->getLabel(verbose) << " SKIPPED" << std::endl;
-					}
-				}
-
-				oss << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
-				if (verbose){
-					for (const auto test : registry_.getWithErrorTests()){
-						oss << "\t\t" << test->getLabel(verbose) << " WITH ERROR: " << test->getError() << std::endl;
-					}
-				}
-			}
-
-		private:
-			RegistryManager registry_;
 		};
 	}
 
@@ -278,188 +229,222 @@ namespace H2OFastTests {
 	*
 	*/
 
-	static void setOss(std::ostream* oss){ detail::default_oss = oss; }
-	static void setIss(std::istream* iss){ detail::default_iss = iss; }
-	static void setErr(std::ostream* err){ detail::default_err = err; }
-	static void setVerbose(bool verbose) { detail::verbose = verbose; }
+	using line_info_t = detail::LineInfo;
+	using registry_manager_t = detail::RegistryManager;
 
-	using test_t = detail::test_t;
-	using skipped_test_t = detail::skipped_test_t;
-	//using test_ptr = detail::test_ptr;
-	using test_func_t = detail::test_func_t;
-	
-	//test_ptr&& make_test(test_func_t&& func){ return std::make_unique<test_t>(std::move(func)); }
-	test_t&& make_test(const std::string& label, test_func_t&& func){ return std::move(test_t(label, std::move(func))); }
-	test_t&& skip_test(test_t&& test){ return std::move(skipped_test_t(std::move(test))); }
-	test_t&& skip_test(const std::string& reason, test_t&& test){ return std::move(skipped_test_t(reason, std::move(test))); }
+	//Interface to Implement to access access a registry information
+	//Possibility to export services into a DLL for forther customization
+	class IRegistryTraversal {
+	public:
+		IRegistryTraversal(const registry_manager_t& registry) : registry_(registry) {}
+		~IRegistryTraversal() {}
+	protected:
+		const registry_manager_t& getRegistryManager() const { return registry_; }
+	protected:
+		registry_manager_t registry_;
+	};
 
-#define register_test(label, unit_test_func) \
-	static H2OFastTests::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::make_test(label, unit_test_func));
-	
-#define register_tests(label, unit_test_func_list) \
-	static H2OFastTests::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::unit_test(label, std::move(unit_test_func_list)));
+	// Trivial impl for console display results
+	class RegistryTraversal_ConsoleIO : IRegistryTraversal {
+	public:
+		RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
+		std::ostream& print(std::ostream& oss, bool verbose) const {
+			auto& registry_manager = getRegistryManager();
+			oss << registry_.get()->getLabel() << " UNIT TEST SUMMARY:" << std::endl;
 
-	void run_tests() { for (auto&& test : detail::registry()) test.run(); }
-	void display_results(bool verbose = false) { for (auto&& test : detail::registry()) *detail::default_oss << test.getLabel(verbose); }
-	void display_results_err(bool verbose = false) { for (auto&& test : detail::registry()) *detail::default_err << test.getLabel(verbose); }
-	void run_and_display(bool verbose = false) { run_tests(); display_results(verbose); }
+			oss << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			if (verbose) {
+				for (const auto test : registry_.getPassedTests()){
+					oss << "\t\t" << test->getLabel(verbose) << " PASSED" << std::endl;
+				}
+			}
 
-#define LINE_INFO() &H2OFastTests::detail::LineInfo(__FILE__, "", __LINE__)
+			oss << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			if (verbose) {
+				for (const auto test : registry_.getFailedTests()){
+					oss << "\t\t" << test->getLabel(verbose) << " FAILED: " << test->getFailureReason() << std::endl;
+				}
+			}
 
-	class Assert
-	{
+			oss << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			if (verbose) {
+				for (const auto test : registry_.getSkippedTests()){
+					oss << "\t\t" << test->getLabel(verbose) << " SKIPPED" << std::endl;
+				}
+			}
+
+			oss << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			if (verbose) {
+				for (const auto test : registry_.getWithErrorTests()){
+					oss << "\t\t" << test->getLabel(verbose) << " WITH ERROR: " << test->getError() << std::endl;
+				}
+			}
+
+			return oss;
+		}
+	};
+
+	// Assert test class to help verbosing test logic into lambda's impl
+	// Heavily inspired by the eponym MSVC's builtin assert class
+	class Assert {
 	public:
 
 		// Verify that two objects are equal.
 		template<typename T>
 		static void AreEqual(const T& expected, const T& actual,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(expected == actual, message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(expected == actual, message, lineInfo);
 		}
 
 		// double equality comparison:
 		static void AreEqual(double expected, double actual, double tolerance,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			double diff = expected - actual;
-			FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
+			detail::FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
 		}
 
 		// float equality comparison:
 		static void AreEqual(float expected, float actual, float tolerance,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			float diff = expected - actual;
-			FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
+			detail::FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
 		}
 
 		// char* string equality comparison:
 		static void AreEqual(const char* expected, const char* actual, bool ignoreCase = false,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			AreEqual(std::string{ expected }, std::string{ actual }, ignoreCase, message, lineInfo);
 		}
 
 		// char* string equality comparison:
 		static void AreEqual(std::string expected, std::string actual, bool ignoreCase = false,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			if (ignoreCase){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			if (ignoreCase) {
 				std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
 				std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
 			}
-			FailOnCondition(expected == actual, message, lineInfo);
+			detail::FailOnCondition(expected == actual, message, lineInfo);
 		}
 
 		// Verify that two references refer to the same object instance (identity):
 		template<typename T>
 		static void AreSame(const T& expected, const T& actual,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(&expected == &actual, message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(&expected == &actual, message, lineInfo);
 		}
 
 		// Generic AreNotEqual comparison:
 		template<typename T> static void AreNotEqual(const T& notExpected, const T& actual,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(!(notExpected == actual), message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(!(notExpected == actual), message, lineInfo);
 		}
 
 		// double AreNotEqual comparison:
 		static void AreNotEqual(double notExpected, double actual, double tolerance,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			double diff = notExpected - actual;
-			FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
+			detail::FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
 		}
 
 		// float AreNotEqual comparison:
 		static void AreNotEqual(float notExpected, float actual, float tolerance,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			float diff = notExpected - actual;
-			FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
+			detail::FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
 		}
 
 		// char* string AreNotEqual comparison:
 		static void AreNotEqual(const char* notExpected, const char* actual, bool ignoreCase = false,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			AreNotEqual(std::string{ notExpected }, std::string{ actual }, ignoreCase, message, lineInfo);
 		}
 
 		// wchar_t* string AreNotEqual comparison with char* message:
 		static void AreNotEqual(std::string notExpected, std::string actual, bool ignoreCase = false,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			if (ignoreCase){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			if (ignoreCase) {
 				std::transform(notExpected.begin(), notExpected.end(), notExpected.begin(), ::tolower);
 				std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
 			}
-			FailOnCondition(notExpected != actual, message, lineInfo);
+			detail::FailOnCondition(notExpected != actual, message, lineInfo);
 		}
 
 
 		// Verify that two references do not refer to the same object instance (identity):
 		template<typename T>
 		static void AreNotSame(const T& notExpected, const T& actual,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(!(&notExpected == &actual), message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(!(&notExpected == &actual), message, lineInfo);
 		}
 
 		// Verify that a pointer is NULL:
 		template<typename T> static void IsNull(const T* actual,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(actual == nullptr, message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(actual == nullptr, message, lineInfo);
 		}
 
 		// Verify that a pointer is not NULL:
 		template<typename T> static void IsNotNull(const T* actual,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(actual != nullptr, message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(actual != nullptr, message, lineInfo);
 		}
 
 		// Verify that a condition is true:
 		static void IsTrue(bool condition,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(condition, message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(condition, message, lineInfo);
 		}
 
 		// Verify that a conditon is false:
 		static void IsFalse(bool condition,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(!condition, message, lineInfo);
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(!condition, message, lineInfo);
 		}
 
 		// Force the test case result to be Failed:
-		static void Fail(const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			FailOnCondition(false, message, lineInfo);
+		static void Fail(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			detail::FailOnCondition(false, message, lineInfo);
 		}
 
 
 		// Verify that a function raises an exception:
 		template<typename ExpectedException, typename Functor>
 		static void ExpectException(Functor functor,
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
-			try{
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+			try {
 				functor();
 			}
-			catch (ExpectedException){
+			catch (ExpectedException) {
 				return;
 			}
-			catch (...){
+			catch (...) {
 				Assert::Fail(message, pLineInfo);
 			}
 		}
 
 		template<typename ExpectedException, typename ReturnType>
 		static void ExpectException(ReturnType(*func)(),
-			const char* message = nullptr, const detail::LineInfo* lineInfo = nullptr){
+			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			Assert::IsNotNull(func, message, lineInfo);
 
-			try{
+			try {
 				func();
 			}
-			catch (ExpectedException){
+			catch (ExpectedException) {
 				return;
 			}
-			catch (...){
+			catch (...) {
 				Assert::Fail(message, pLineInfo);
 			}
 		}
 	};
-
 }
+
+//Helper macros to use the unit test suit
+#define register_tests(name, description, ...) \
+	static H2OFastTests::detail::RegistryManager registry_manager_ # name {description, __VA_ARGS__};
+#define run_tests(name) registry_manager_ # name.run_tests();
+#define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ # name).print(*detail::default_oss, verbose)
+#define LINE_INFO() &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
 
 #endif
