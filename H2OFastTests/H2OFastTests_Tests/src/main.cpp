@@ -12,9 +12,9 @@ register_scenario(TEST1, "Test 1",
 		Assert::Fail("nooooo", line_info());
 	}),
 	
-	describe_test([](){
+	skip_test(describe_test([](){
 		Assert::IsTrue(true, "yeah !");
-	}),
+	})),
 
 	describe_test_label("RUNTIMERROR_TEST", [](){
 		throw std::runtime_error("fail this with an error man !");

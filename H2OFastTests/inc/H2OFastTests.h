@@ -34,7 +34,7 @@ namespace H2OFastTests {
 
 		class TestFailure : public std::exception {
 		public:
-			TestFailure(std::string message) : message_(message) {}
+			TestFailure(const std::string& message) : message_(message) {}
 			virtual const char * what() const { return message_.c_str(); }
 		private:
 			const std::string message_;
@@ -62,9 +62,9 @@ namespace H2OFastTests {
 				PASSED, FAILED, ERROR, SKIPPED, NONE
 			};
 
-			Test() : Test({}, [](){}) {}
+			Test() : Test({}, []() {}) {}
 			Test(const test_func_t&& test) : Test("", std::move(test)) {}
-			Test(const std::string& label) : Test(label, [](){}) {}
+			Test(const std::string& label) : Test(label, []() {}) {}
 			Test(const std::string& label, const test_func_t&& test)
 				: label_(label), status_(NONE), test_holder_(std::make_shared<test_func_t>(std::move(test)))
 			{}
@@ -155,8 +155,10 @@ namespace H2OFastTests {
 		std::shared_ptr<test_t> make_test(test_func_t&& func) { return std::make_shared<test_t>(std::move(func)); }
 		std::shared_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return std::make_shared<test_t>(label, std::move(func)); }
 		std::shared_ptr<test_t> make_test(std::shared_ptr<test_t>&& test) { return test; }
-		std::shared_ptr<test_t> skip_test(test_t&& test) { return std::make_shared<skipped_test_t>(std::move(test)); }
-		std::shared_ptr<test_t> skip_test(const std::string& reason, test_t&& test) { return std::make_shared<skipped_test_t>(reason, std::move(test)); }
+		std::shared_ptr<test_t> make_skipped_test(test_t&& test) { return std::make_shared<skipped_test_t>(std::move(test)); }
+		std::shared_ptr<test_t> make_skipped_test(const std::string& reason, test_t&& test) { return std::make_shared<skipped_test_t>(reason, std::move(test)); }
+		std::shared_ptr<test_t> make_skipped_test(std::shared_ptr<test_t>&& test) { return std::make_shared<skipped_test_t>(std::move(*test)); }
+		std::shared_ptr<test_t> make_skipped_test(const std::string& reason, std::shared_ptr<test_t>&& test) { return std::make_shared<skipped_test_t>(reason, std::move(*test)); }
 
 		using registry_storage_t = std::deque<std::shared_ptr<test_t>>;
 
@@ -164,7 +166,7 @@ namespace H2OFastTests {
 		class Registry {
 		public:
 			Registry(const std::string& label, registry_storage_t* tests_list) : label_(label), tests_list_(tests_list) {}
-			registry_storage_t& get() {	return *tests_list_; };
+			registry_storage_t& get() { return *tests_list_; };
 			const registry_storage_t& get() const { return const_cast<Registry*>(this)->get(); };
 			const std::string& getLabel() const { return label_; }
 		private:
@@ -254,7 +256,7 @@ namespace H2OFastTests {
 	};
 
 	// Trivial impl for console display results
-	class RegistryTraversal_ConsoleIO : IRegistryTraversal {
+	class RegistryTraversal_ConsoleIO : private IRegistryTraversal {
 	public:
 		RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
 		std::ostream& print(std::ostream& oss, bool verbose) const {
@@ -263,28 +265,28 @@ namespace H2OFastTests {
 
 			oss << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getPassedTests()){
+				for (const auto test : registry_.getPassedTests()) {
 					oss << "\t\t[" << test->getLabel(verbose) << "] PASSED" << std::endl;
 				}
 			}
 
 			oss << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getFailedTests()){
+				for (const auto test : registry_.getFailedTests()) {
 					oss << "\t\t[" << test->getLabel(verbose) << "] FAILED: " << test->getFailureReason() << std::endl;
 				}
 			}
 
 			oss << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getSkippedTests()){
+				for (const auto test : registry_.getSkippedTests()) {
 					oss << "\t\t[" << test->getLabel(verbose) << "] SKIPPED" << std::endl;
 				}
 			}
 
 			oss << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getWithErrorTests()){
+				for (const auto test : registry_.getWithErrorTests()) {
 					oss << "\t\t[" << test->getLabel(verbose) << "] WITH ERROR: " << test->getError() << std::endl;
 				}
 			}
@@ -452,7 +454,9 @@ namespace H2OFastTests {
 	static H2OFastTests::registry_storage_t tests_list_ ## name; \
 	static H2OFastTests::registry_manager_t registry_manager_ ## name {description, &tests_list_ ## name, { __VA_ARGS__ } };
 #define describe_test(test) H2OFastTests::detail::make_test((test))
-#define describe_test_label(description, test) H2OFastTests::detail::make_test(description, (test))
+#define describe_test_label(label, test) H2OFastTests::detail::make_test(label, (test))
+#define skip_test(test) H2OFastTests::detail::make_skipped_test((test))
+#define skip_test_reason(reason, test) H2OFastTests::detail::make_skipped_test(reason, (test))
 #define run_scenario(name) registry_manager_ ## name.run_tests();
 #define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ ## name).print(std::cout, (verbose))
 #define line_info() &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
