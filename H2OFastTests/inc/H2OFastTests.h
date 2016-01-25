@@ -442,9 +442,9 @@ namespace H2OFastTests {
 
 //Helper macros to use the unit test suit
 #define register_tests(name, description, ...) \
-	static H2OFastTests::detail::RegistryManager registry_manager_ # name {description, __VA_ARGS__};
-#define run_tests(name) registry_manager_ # name.run_tests();
-#define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ # name).print(*detail::default_oss, verbose)
+	static H2OFastTests::detail::RegistryManager registry_manager_ ## name {description, __VA_ARGS__};
+#define run_tests(name) registry_manager_ ## name.run_tests();
+#define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ ## name).print(std::cout, verbose)
 #define LINE_INFO() &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
 
 #endif
