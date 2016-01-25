@@ -4,6 +4,7 @@
 #define H2OFASTTESTS_H
 
 #include <algorithm>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -157,7 +158,7 @@ namespace H2OFastTests {
 		std::shared_ptr<test_t> skip_test(test_t&& test) { return std::make_shared<skipped_test_t>(std::move(test)); }
 		std::shared_ptr<test_t> skip_test(const std::string& reason, test_t&& test) { return std::make_shared<skipped_test_t>(reason, std::move(test)); }
 
-		using registry_storage_t = std::vector<std::shared_ptr<test_t>>;
+		using registry_storage_t = std::deque<std::shared_ptr<test_t>>;
 
 		// Registry main impl
 		class Registry {
@@ -237,6 +238,7 @@ namespace H2OFastTests {
 	*/
 
 	using line_info_t = detail::LineInfo;
+	using registry_storage_t = detail::registry_storage_t;
 	using registry_manager_t = detail::RegistryManager;
 
 	//Interface to Implement to access access a registry information
@@ -447,12 +449,12 @@ namespace H2OFastTests {
 
 //Helper macros to use the unit test suit
 #define register_scenario(name, description, ...) \
-	static H2OFastTests::detail::registry_storage_t tests_list_ ## name; \
-	static H2OFastTests::detail::RegistryManager registry_manager_ ## name {description, &tests_list_ ## name, { __VA_ARGS__ } };
+	static H2OFastTests::registry_storage_t tests_list_ ## name; \
+	static H2OFastTests::registry_manager_t registry_manager_ ## name {description, &tests_list_ ## name, { __VA_ARGS__ } };
 #define describe_test(test) H2OFastTests::detail::make_test((test))
 #define describe_test_label(description, test) H2OFastTests::detail::make_test(description, (test))
 #define run_scenario(name) registry_manager_ ## name.run_tests();
-#define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ ## name).print(std::cout, verbose)
+#define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ ## name).print(std::cout, (verbose))
 #define line_info() &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
 #define line_info_f() &H2OFastTests::line_info_t(__FILE__, __FUNCTION__, __LINE__)
 
