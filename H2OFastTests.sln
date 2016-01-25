@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTestTool", "UnitTestTool\UnitTestTool.vcxproj", "{BEF0E9AE-EB25-4B8F-AA58-39FE11380335}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "H2OFastTests", "H2OFastTests\H2OFastTests.vcxproj", "{BEF0E9AE-EB25-4B8F-AA58-39FE11380335}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTestTool_Tests", "UnitTestTool\UnitTestTool_Tests\UnitTestTool_Tests.vcxproj", "{A1D0CC43-62F3-4320-BC28-AA10DD1C5D5E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTestTool_Tests", "H2OFastTests\H2OFastTests_Tests\H2OFastTests_Tests.vcxproj", "{A1D0CC43-62F3-4320-BC28-AA10DD1C5D5E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,11 +1,10 @@
 #pragma once
 
-#ifndef UNITTESTTOOL_H
-#define UNITTESTTOOL_H
+#ifndef H2OFASTTESTS_H
+#define H2OFASTTESTS_H
 
 #include <algorithm>
 #include <functional>
-#include <initializer_list>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -13,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace UnitTestTool {
+namespace H2OFastTests {
 
 	// Implementation details
 
@@ -69,7 +68,7 @@ namespace UnitTestTool {
 		public:
 
 			enum Status {
-				PASSED, FAILED, ERROR, SKIPPED, UNIT, NONE
+				PASSED, FAILED, ERROR, SKIPPED, NONE
 			};
 
 			Test() : Test({}, [](){}) {}
@@ -111,14 +110,7 @@ namespace UnitTestTool {
 			const std::string getError() const { return getError_private(); }
 			Status getStatus() const { return getStatus_private(); }
 
-			size_t getPassedCount() const { return getPassedCount_private(); }
-			size_t getFailedCount() const { return getFailedCount_private(); }
-			size_t getSkippedCount() const { return getSkippedCount_private(); }
-			size_t getErrorCount() const { return getErrorCount_private(); }
-
 		private:
-
-			// Solo test Impl
 
 			virtual void run_private() {
 				try {
@@ -140,11 +132,6 @@ namespace UnitTestTool {
 			virtual const std::string getSkippedReason_private() const { return skipped_reason_; }
 			virtual const std::string getError_private() const { return error_; }
 			virtual Status getStatus_private() const { return status_; }
-
-			virtual size_t getPassedCount_private() const { return static_cast<size_t>(status_ == PASSED); }
-			virtual size_t getFailedCount_private() const { return static_cast<size_t>(status_ == FAILED); }
-			virtual size_t getSkippedCount_private() const { return static_cast<size_t>(status_ == SKIPPED); }
-			virtual size_t getErrorCount_private() const { return static_cast<size_t>(status_ == ERROR); }
 
 		protected:
 
@@ -176,101 +163,111 @@ namespace UnitTestTool {
 
 		using skipped_test_t = detail::SkippedTest;
 
-		class UnitTest : public Test {
+		class Registry{
 		public:
-
-			UnitTest(std::vector<test_t>&& tests)
-				: Test{ }, tests_({}) {
-				std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [this](test_t&& test){
-					tests_.push_back(std::move(std::make_unique<test_t>(std::move(test))));
-				});
+			using registry_storage_t = std::vector<test_t>;
+			Registry(const std::string& label) : label_(label) {}
+			registry_storage_t& get() {
+				static registry_storage_t tests_list{};
+				return tests_list;
+			};
+			const registry_storage_t& get() const {
+				return const_cast<Registry*>(this)->get();
+			};
+			const std::string& getLabel() const{
+				return label_;
 			}
-
-			UnitTest(const std::string& unit_label, std::vector<test_t>&& tests)
-				: Test{ unit_label }, tests_({}) {
-				std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [this](test_t&& test){
-					tests_.push_back(std::make_unique<test_t>(std::move(test)));
-				});
-			}
-
 		private:
+			std::string label_;
+		};
 
-			virtual void run_private() {
-				status_ = UNIT;
-				for (auto&& test : tests_) {
-					test->run();
-					switch (test->getStatus()) {
-					case PASSED: testsPassed_.push_back(test.get());   break;
-					case FAILED: testsFailed_.push_back(test.get());   break;
-					case SKIPPED:testsSkipped_.push_back(test.get());  break;
-					case ERROR:  testsWithError_.push_back(test.get()); break;
-					case UNIT:   *default_err << "nested unit test not implemented yet" << std::endl; break;
+		class RegistryManager {
+		public:
+			RegistryManager(const std::string& label) : registry_(label) {}
+			void push_back(test_t&& func) {
+				registry_.get().push_back(std::move(func));
+			}
+			Registry* get() {
+				return &registry_;
+			}
+			const Registry* get() const {
+				return &registry_;
+			}
+			void run_tests() {
+				auto tests = registry_.get();
+				for (auto&& test : tests) {
+					test.run();
+					switch (test.getStatus()) {
+					case test_t::PASSED: testsPassed_.push_back(&test);   break;
+					case test_t::FAILED: testsFailed_.push_back(&test);   break;
+					case test_t::SKIPPED:testsSkipped_.push_back(&test);  break;
+					case test_t::ERROR:  testsWithError_.push_back(&test); break;
 					default: break;
 					}
 				}
 			}
+			size_t getPassedCount() const { return testsPassed_.size(); }
+			const std::vector<const test_t*>& getPassedTests() const { return testsPassed_; }
 
-			virtual const std::string getLabel_private(bool verbose) const {
-				std::ostringstream oss;
-				oss << label_ << " UNIT TEST SUMMARY:" << std::endl;
+			size_t getFailedCount() const { return testsFailed_.size(); }
+			const std::vector<const test_t*>& getFailedTests() const { return testsFailed_; }
 
-				oss << "\tPASSED:" << getPassedCount() << "/" << tests_.size() << std::endl;
+			size_t getSkippedCount() const { return testsSkipped_.size(); }
+			const std::vector<const test_t*>& getSkippedTests() const { return testsSkipped_; }
+
+			size_t getWithErrorCount() const { return testsWithError_.size(); }
+			const std::vector<const test_t*>& getWithErrorTests() const { return testsWithError_; }
+
+			size_t getAllTestsCount() const { return get()->get().size(); }
+			const Registry::registry_storage_t& getAllTests() const { return get()->get(); }
+		private:
+			Registry registry_;
+
+			std::vector<const test_t*> testsPassed_;
+			std::vector<const test_t*> testsFailed_;
+			std::vector<const test_t*> testsSkipped_;
+			std::vector<const test_t*> testsWithError_;
+		};
+
+		class Registry_Traversal{
+		public:
+
+			Registry_Traversal(RegistryManager& registry) : registry_(registry) {}
+
+			std::ostream& printResult(std::ostream& oss) const {
+				oss << registry_.get()->getLabel() << " UNIT TEST SUMMARY:" << std::endl;
+
+				oss << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 				if (verbose){
-					for (const auto test : testsPassed_){
+					for (const auto test : registry_.getPassedTests()){
 						oss << "\t\t" << test->getLabel(verbose) << " PASSED" << std::endl;
 					}
 				}
 
-				oss << "\tFAILED:" << getFailedCount() << "/" << tests_.size() << std::endl;
+				oss << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 				if (verbose){
-					for (const auto test : testsFailed_){
+					for (const auto test : registry_.getFailedTests()){
 						oss << "\t\t" << test->getLabel(verbose) << " FAILED: " << test->getFailureReason() << std::endl;
 					}
 				}
 
-				oss << "\tSKIPPED:" << getSkippedCount() << "/" << tests_.size() << std::endl;
+				oss << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 				if (verbose){
-					for (const auto test : testsSkipped_){
+					for (const auto test : registry_.getSkippedTests()){
 						oss << "\t\t" << test->getLabel(verbose) << " SKIPPED" << std::endl;
 					}
 				}
 
-				oss << "\tERRORS:" << getErrorCount() << "/" << tests_.size() << std::endl;
+				oss << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
 				if (verbose){
-					for (const auto test : testsWithError_){
+					for (const auto test : registry_.getWithErrorTests()){
 						oss << "\t\t" << test->getLabel(verbose) << " WITH ERROR: " << test->getError() << std::endl;
 					}
 				}
-
-				return oss.str();
 			}
-
-			virtual size_t getPassedCount_private() const { return testsPassed_.size(); }
-			virtual size_t getFailedCount_private() const { return testsFailed_.size(); }
-			virtual size_t getSkippedCount_private() const { return testsSkipped_.size(); }
-			virtual size_t getErrorCount_private() const { return testsWithError_.size(); }
 
 		private:
-
-			std::vector<std::unique_ptr<test_t>> tests_;
-
-			std::vector<Test*> testsPassed_;
-			std::vector<Test*> testsFailed_;
-			std::vector<Test*> testsSkipped_;
-			std::vector<Test*> testsWithError_;
-		};
-
-		using unit_test_t = detail::UnitTest;
-
-		std::vector<test_t>& registry() {
-			static std::vector<test_t> tests_list{};
-			return tests_list;
-		};
-
-		struct UnitTestTool_registrar {
-			UnitTestTool_registrar(test_t&& func)	{
-				registry().push_back(std::move(func));
-			}
+			RegistryManager registry_;
 		};
 	}
 
@@ -287,7 +284,6 @@ namespace UnitTestTool {
 	static void setVerbose(bool verbose) { detail::verbose = verbose; }
 
 	using test_t = detail::test_t;
-	using unit_test_t = detail::unit_test_t;
 	using skipped_test_t = detail::skipped_test_t;
 	//using test_ptr = detail::test_ptr;
 	using test_func_t = detail::test_func_t;
@@ -296,54 +292,19 @@ namespace UnitTestTool {
 	test_t&& make_test(const std::string& label, test_func_t&& func){ return std::move(test_t(label, std::move(func))); }
 	test_t&& skip_test(test_t&& test){ return std::move(skipped_test_t(std::move(test))); }
 	test_t&& skip_test(const std::string& reason, test_t&& test){ return std::move(skipped_test_t(reason, std::move(test))); }
-	template<typename ... Args>
-	test_t&& unit_test(Args ... args){ return std::move(unit_test_t(std::move(tests))); }
-	test_t&& unit_test(const std::string& label, std::vector<test_t>&& tests){ return std::move(unit_test_t(label, std::move(tests))); }
-	/*
-	test_ptr unit_test(const std::string& label, std::vector<test_t>&& tests){
-		auto&& tests_ptr = std::vector<test_ptr>{};
-		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_t&& test){
-			tests_ptr.push_back(std::make_unique<test_t>(std::move(test)));
-		});
-		return std::make_unique<unit_test_t>(label, std::move(tests_ptr));
-	}
-	test_ptr unit_test(std::vector<test_t>&& tests){
-		auto&& tests_ptr = std::vector<test_ptr>{};
-		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_t&& test){
-			tests_ptr.push_back(std::make_unique<test_t>(std::move(test)));
-		});
-		return std::make_unique<unit_test_t>(std::move(tests_ptr));
-	}
-	*/
-	/*
-	test_ptr unit_test(const std::string& label, std::vector<test_func_t>&& tests){
-		auto tests_ptr = std::vector<test_ptr>{};
-		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_func_t&& test){
-			tests_ptr.push_back(make_test(std::move(test)));
-		});
-		return std::make_unique<unit_test_t>(label, std::move(tests_ptr));
-	}
-	test_ptr unit_test(std::vector<test_func_t>&& tests){
-		auto tests_ptr = std::vector<test_ptr>{};
-		std::for_each(make_move_iterator(tests.begin()), make_move_iterator(tests.end()), [&tests_ptr](test_func_t&& test){
-			tests_ptr.push_back(make_test(std::move(test)));
-		});
-		return std::make_unique<unit_test_t>(std::move(tests_ptr));
-	}
-	*/
 
 #define register_test(label, unit_test_func) \
-	static UnitTestTool::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::make_test(label, unit_test_func));
+	static H2OFastTests::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::make_test(label, unit_test_func));
 	
 #define register_tests(label, unit_test_func_list) \
-	static UnitTestTool::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::unit_test(label, std::move(unit_test_func_list)));
+	static H2OFastTests::detail::UnitTestTool_registrar UnitTestTool_registrar(UnitTestTool::unit_test(label, std::move(unit_test_func_list)));
 
 	void run_tests() { for (auto&& test : detail::registry()) test.run(); }
 	void display_results(bool verbose = false) { for (auto&& test : detail::registry()) *detail::default_oss << test.getLabel(verbose); }
 	void display_results_err(bool verbose = false) { for (auto&& test : detail::registry()) *detail::default_err << test.getLabel(verbose); }
 	void run_and_display(bool verbose = false) { run_tests(); display_results(verbose); }
 
-#define LINE_INFO() &UnitTestTool::detail::LineInfo(__FILE__, "", __LINE__)
+#define LINE_INFO() &H2OFastTests::detail::LineInfo(__FILE__, "", __LINE__)
 
 	class Assert
 	{

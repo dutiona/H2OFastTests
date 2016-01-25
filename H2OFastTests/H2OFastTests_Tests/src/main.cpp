@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "../../inc/UnitTestTool.h"
+#include "../../inc/H2OFastTests.h"
 
 
 
@@ -14,7 +14,7 @@ public:
 
 };
 
-using namespace UnitTestTool;
+using namespace H2OFastTests;
 
 
 /*
@@ -24,25 +24,25 @@ const std::string str = "1 + 2 = 3 !";
 */
 /*
 register_tests("Test", {
-	make_test([](){
-		const std::string str = "1 + 2 = 3 !";
-		Assert::Fail(":'(", LINE_INFO());
-	}),
-		make_test([](){
-		const bool b = true;
-		Assert::IsTrue(b);
-	})
+make_test([](){
+const std::string str = "1 + 2 = 3 !";
+Assert::Fail(":'(", LINE_INFO());
+}),
+make_test([](){
+const bool b = true;
+Assert::IsTrue(b);
+})
 }})
 */
 
 
-static UnitTestTool::detail::UnitTestTool_registrar UnitTestTool_registrar(
-	UnitTestTool::unit_test("Test", {
+static H2OFastTests::detail::UnitTestTool_registrar UnitTestTool_registrar(
+	H2OFastTests::unit_test("Test", {
 		make_test("hahah", [](){
 			const std::string str = "1 + 2 = 3 !";
 			Assert::Fail(":'(", LINE_INFO());
 		}),
-		make_test("hohoho", [](){
+			make_test("hohoho", [](){
 			const bool b = true;
 			Assert::IsTrue(b);
 		})
@@ -52,8 +52,8 @@ static UnitTestTool::detail::UnitTestTool_registrar UnitTestTool_registrar(
 
 int main(int /*argc*/, char* /*argv[]*/){
 
-		UnitTestTool::run_and_display(true);
+	H2OFastTests::run_and_display(true);
 
-		system("PAUSE");
-		//std::cout << "Hello world !" << std::endl;
+	system("PAUSE");
+	//std::cout << "Hello world !" << std::endl;
 }
