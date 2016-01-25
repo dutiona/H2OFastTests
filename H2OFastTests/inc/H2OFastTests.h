@@ -153,6 +153,7 @@ namespace H2OFastTests {
 		// Helper functions to build/skip a test case
 		std::shared_ptr<test_t> make_test(test_func_t&& func) { return std::make_shared<test_t>(std::move(func)); }
 		std::shared_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return std::make_shared<test_t>(label, std::move(func)); }
+		std::shared_ptr<test_t> make_test(std::shared_ptr<test_t>&& test) { return test; }
 		std::shared_ptr<test_t> skip_test(test_t&& test) { return std::make_shared<skipped_test_t>(std::move(test)); }
 		std::shared_ptr<test_t> skip_test(const std::string& reason, test_t&& test) { return std::make_shared<skipped_test_t>(reason, std::move(test)); }
 
@@ -171,13 +172,15 @@ namespace H2OFastTests {
 		//Building a registry and filling it in a static context
 		class RegistryManager {
 		public:
-
-			RegistryManager(const std::string& label, test_func_t&& tests...)
+			RegistryManager(const std::string& label, std::initializer_list<std::shared_ptr<test_t>> tests)
 				: registry_(label) {
-				push_back(make_test(std::move(tests)));
+				for (auto& test : tests)
+					push_back(test);
 			}
 
-			void push_back(std::shared_ptr<test_t>&& func) { registry_.get().push_back(std::move(func)); }
+			void push_back(const std::shared_ptr<test_t>& func) {
+				registry_.get().push_back(std::move(func));
+			}
 
 			Registry* get() { return &registry_; }
 			const Registry* get() const { return &registry_; }
@@ -250,33 +253,33 @@ namespace H2OFastTests {
 		RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
 		std::ostream& print(std::ostream& oss, bool verbose) const {
 			auto& registry_manager = getRegistryManager();
-			oss << registry_.get()->getLabel() << " UNIT TEST SUMMARY:" << std::endl;
+			oss << "[" << registry_.get()->getLabel() << "] UNIT TEST SUMMARY:" << std::endl;
 
 			oss << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getPassedTests()){
-					oss << "\t\t" << test->getLabel(verbose) << " PASSED" << std::endl;
+					oss << "\t\t[" << test->getLabel(verbose) << "] PASSED" << std::endl;
 				}
 			}
 
 			oss << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getFailedTests()){
-					oss << "\t\t" << test->getLabel(verbose) << " FAILED: " << test->getFailureReason() << std::endl;
+					oss << "\t\t[" << test->getLabel(verbose) << "] FAILED: " << test->getFailureReason() << std::endl;
 				}
 			}
 
 			oss << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getSkippedTests()){
-					oss << "\t\t" << test->getLabel(verbose) << " SKIPPED" << std::endl;
+					oss << "\t\t[" << test->getLabel(verbose) << "] SKIPPED" << std::endl;
 				}
 			}
 
 			oss << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getWithErrorTests()){
-					oss << "\t\t" << test->getLabel(verbose) << " WITH ERROR: " << test->getError() << std::endl;
+					oss << "\t\t[" << test->getLabel(verbose) << "] WITH ERROR: " << test->getError() << std::endl;
 				}
 			}
 
@@ -441,10 +444,13 @@ namespace H2OFastTests {
 }
 
 //Helper macros to use the unit test suit
-#define register_tests(name, description, ...) \
-	static H2OFastTests::detail::RegistryManager registry_manager_ ## name {description, __VA_ARGS__};
-#define run_tests(name) registry_manager_ ## name.run_tests();
+#define register_scenario(name, description, ...) \
+	static H2OFastTests::detail::RegistryManager registry_manager_ ## name {description, { __VA_ARGS__ } };
+#define describe_test(test) H2OFastTests::detail::make_test((test))
+#define describe_test_label(description, test) H2OFastTests::detail::make_test(description, (test))
+#define run_scenario(name) registry_manager_ ## name.run_tests();
 #define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ ## name).print(std::cout, verbose)
-#define LINE_INFO() &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
+#define line_info() &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
+#define line_info_f() &H2OFastTests::line_info_t(__FILE__, __FUNCTION__, __LINE__)
 
 #endif

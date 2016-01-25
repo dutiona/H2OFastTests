@@ -1,37 +1,33 @@
 #include <iostream>
-
+#include <stdexcept>
 #include "../../inc/H2OFastTests.h"
 
-
-
-class A{
-public:
-
-	A();
-
-	static int add(int a, int b) { return a + b; }
-	static int minus(int a, int b) { return a - b; }
-
-};
 
 using namespace H2OFastTests;
 
 
+register_scenario(TEST1, "Test 1",
 
+	describe_test_label("fail !", [](){
+		Assert::Fail("nooooo", line_info());
+	}),
+	
+	describe_test([](){
+		Assert::IsTrue(true, "yeah !");
+	}),
 
-
-register_tests(TEST1, "Test 1", [](){
-	Assert::Fail("nooooo", LINE_INFO());
-});
+	describe_test_label("RUNTIMERROR_TEST", [](){
+		throw std::runtime_error("fail this with an error man !");
+	})
+);
 
 
 int main(int /*argc*/, char* /*argv[]*/){
 
 	
-	run_tests(TEST1);
+	run_scenario(TEST1);
 	print_result(TEST1, true);
 	
-
 	system("PAUSE");
 	//std::cout << "Hello world !" << std::endl;
 }
