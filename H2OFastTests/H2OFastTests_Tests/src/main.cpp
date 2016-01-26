@@ -1,7 +1,8 @@
+#include "H2OFastTests.h"
+
+#include <limits>
 #include <iostream>
 #include <stdexcept>
-#include "../../inc/H2OFastTests.h"
-
 
 using namespace H2OFastTests;
 
@@ -25,11 +26,9 @@ register_scenario(TEST1, "Test 1",
 register_scenario(TEST2, "youhou", describe_test([](){}));
 
 int main(int /*argc*/, char* /*argv[]*/){
-
-	
+	register_observer(TEST1, H2OFastTests::ConsoleIO_Observer);
 	run_scenario(TEST1);
 	print_result(TEST1, true);
-	
-	system("PAUSE");
-	//std::cout << "Hello world !" << std::endl;
+	std::cout << "Press enter to continue...";
+	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 }

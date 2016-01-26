@@ -1,25 +1,40 @@
+/*
+ *
+ *  (C) Copyright 2016 Michaël Roynard
+ *
+ *  Distributed under the MIT License, Version 1.0. (See accompanying
+ *  file LICENSE or copy at https://opensource.org/licenses/MIT)
+ *
+ *  See https://github.com/dutiona/H2OFastTests for documentation.
+ */
+
 #pragma once
 
 #ifndef H2OFASTTESTS_H
 #define H2OFASTTESTS_H
 
 #include <algorithm>
+#include <chrono>
 #include <deque>
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+
 namespace H2OFastTests {
 
 	// Implementation details
-
 	namespace detail {
+
+		// Line info struct
+		// Holds line number, file name and function name if relevant
 		struct LineInfo {
-			const std::string file_;
+			const std::string file_; 
 			const std::string func_;
 			const int line_;
 			LineInfo(const char* file, const char* func, int line)
@@ -27,11 +42,14 @@ namespace H2OFastTests {
 			{}
 		};
 
-		std::ostream& operator<<(std::ostream& oss, const LineInfo& lineInfo) {
-			oss << lineInfo.file_ << ":" << lineInfo.line_ << " " << lineInfo.func_;
-			return oss;
+		// Basic display
+		std::ostream& operator<<(std::ostream& os, const LineInfo& lineInfo) {
+			os << lineInfo.file_ << ":" << lineInfo.line_ << " " << lineInfo.func_;
+			return os;
 		}
 
+		// Internal exception raised when a test failed
+		// Used by internal test runner and assert tool to communicate over the test
 		class TestFailure : public std::exception {
 		public:
 			TestFailure(const std::string& message) : message_(message) {}
@@ -40,6 +58,7 @@ namespace H2OFastTests {
 			const std::string message_;
 		};
 
+		// Internal impl for processing an assert and raise the TestFailure Exception
 		void FailOnCondition(bool condition, const char* message = nullptr, const LineInfo* lineInfo = nullptr) {
 			if (!condition) {
 				std::ostringstream oss;
@@ -54,14 +73,24 @@ namespace H2OFastTests {
 		}
 
 		using test_func_t = std::function<void(void)>;
+		using duration_t = std::chrono::duration<double, std::milli>; // ms
 
+		// Standard class discribing a test
 		class Test {
 		public:
 
+			// States of the test
 			enum Status {
-				PASSED, FAILED, ERROR, SKIPPED, NONE
+				PASSED,	// test successfuly passed
+				FAILED,	// test failed to pass (an assert failed)
+				ERROR,	// an error occured during the test :
+						// any exception was catched like bad_alloc
+				SKIPPED,// test was skipped and not run
+				NONE	// the run_scenario function wasn't run yet
+						// for the scenario holding the test
 			};
 
+			// All available constructors
 			Test() : Test({}, []() {}) {}
 			Test(const test_func_t&& test) : Test("", std::move(test)) {}
 			Test(const std::string& label) : Test(label, []() {}) {}
@@ -69,38 +98,42 @@ namespace H2OFastTests {
 				: label_(label), status_(NONE), test_holder_(std::make_shared<test_func_t>(std::move(test)))
 			{}
 
-			// Default move impl for VC2013
-
+			// Default move impl (for VC2013)
 			Test(Test&& test)
-				: test_holder_(std::make_shared<test_func_t>(std::move(*test.test_holder_))),
-				label_(test.label_), status_(test.status_),
-				failure_reason_(test.failure_reason_), error_(test.error_)
+				: test_holder_(test.test_holder_),
+				label_(test.label_), status_(test.status_), exec_time_ms_(test.exec_time_ms_),
+				failure_reason_(test.failure_reason_), skipped_reason_(test.skipped_reason_), error_(test.error_)
 			{}
-
 			Test&& operator=(Test&& test) {
-				test_holder_ = std::make_shared<test_func_t>(std::move(*test.test_holder_));
+				test_holder_ = test.test_holder_;
 				label_ = test.label_;
 				status_ = test.status_;
+				exec_time_ms_ = test.exec_time_ms_;
 				failure_reason_ = test.failure_reason_;
+				skipped_reason_ = test.skipped_reason_;
 				error_ = test.error_;
 				return std::move(*this);
 			}
 
+			// Virtual destructor impl
 			virtual ~Test() {}
 
-			// NVI
-
-			void run() { run_private(); }
-
-			const std::string getLabel(bool verbose) const { return getLabel_private(verbose); }
-			const std::string getFailureReason() const { return getFailureReason_private(); }
-			const std::string getSkippedReason() const { return getSkippedReason_private(); }
-			const std::string getError() const { return getError_private(); }
+			// Information getters
+			const std::string& getLabel(bool verbose) const { return getLabel_private(verbose); }
+			const std::string& getFailureReason() const { return getFailureReason_private(); }
+			const std::string& getSkippedReason() const { return getSkippedReason_private(); }
+			const std::string& getError() const { return getError_private(); }
+			duration_t getExecTimeMs() const { return getExecTimeMs_private(); }
 			Status getStatus() const { return getStatus_private(); }
 
 		private:
 
+			// NVI for public interface
+			void run() { run_private(); }
+
+			// Run the test and capture and set the state
 			virtual void run_private() {
+				auto start = std::chrono::high_resolution_clock::now();
 				try {
 					(*test_holder_)(); /* /!\ Here is the test call /!\ */
 					status_ = PASSED;
@@ -113,16 +146,20 @@ namespace H2OFastTests {
 					status_ = ERROR;
 					error_ = e.what();
 				}
+				exec_time_ms_ = std::chrono::high_resolution_clock::now() - start;
 			}
 
-			virtual const std::string getLabel_private(bool /*verbose*/) const { return label_; }
-			virtual const std::string getFailureReason_private() const { return failure_reason_; }
-			virtual const std::string getSkippedReason_private() const { return skipped_reason_; }
-			virtual const std::string getError_private() const { return error_; }
+			// Informations getters impl
+			virtual const std::string& getLabel_private(bool /*verbose*/) const { return label_; }
+			virtual const std::string& getFailureReason_private() const { return failure_reason_; }
+			virtual const std::string& getSkippedReason_private() const { return skipped_reason_; }
+			virtual const std::string& getError_private() const { return error_; }
+			virtual duration_t getExecTimeMs_private() const { return exec_time_ms_; }
 			virtual Status getStatus_private() const { return status_; }
 
 		protected:
 
+			duration_t exec_time_ms_;
 			std::shared_ptr<test_func_t> test_holder_;
 			std::string label_;
 			std::string failure_reason_;
@@ -130,10 +167,34 @@ namespace H2OFastTests {
 			std::string error_;
 			Status status_;
 
+			friend class RegistryManager;
 		};
 
 		using test_t = detail::Test;
 
+		std::ostream& operator<<(std::ostream& os, test_t::Status status) {
+			switch (status)	{
+			case H2OFastTests::detail::Test::PASSED:
+				os << "PASSED";
+				break;
+			case H2OFastTests::detail::Test::FAILED:
+				os << "FAILED";
+				break;
+			case H2OFastTests::detail::Test::ERROR:
+				os << "ERROR";
+				break;
+			case H2OFastTests::detail::Test::SKIPPED:
+				os << "SKIPPED";
+				break;
+			case H2OFastTests::detail::Test::NONE:
+			default:
+				os << "NOT RUN YET";
+				break;
+			}
+			return os;
+		}
+
+		// This class wrap a test and make it so it's skipped (never run)
 		class SkippedTest : public Test {
 		public:
 
@@ -145,6 +206,7 @@ namespace H2OFastTests {
 
 		private:
 
+			// Put state to skipped and don't run the test
 			virtual void run_private() { status_ = SKIPPED; }
 
 		};
@@ -165,7 +227,9 @@ namespace H2OFastTests {
 		// Registry main impl
 		class Registry {
 		public:
+			// Build a registry with a pointer on the static storage as 2nd arg
 			Registry(const std::string& label, registry_storage_t* tests_list) : label_(label), tests_list_(tests_list) {}
+			//Getters
 			registry_storage_t& get() { return *tests_list_; };
 			const registry_storage_t& get() const { return const_cast<Registry*>(this)->get(); };
 			const std::string& getLabel() const { return label_; }
@@ -174,60 +238,102 @@ namespace H2OFastTests {
 			registry_storage_t* tests_list_;
 		};
 
-		//Building a registry and filling it in a static context
-		class RegistryManager {
+		// POD containing informations about a test
+		struct TestInfos {
+			const test_t& test;
+			using status_t = test_t::Status;
+		};
+
+		using tests_infos_t = TestInfos;
+
+		// Interface for making an observer
+		class IRegistryObserver {
 		public:
+			virtual void update(const tests_infos_t& infos) const = 0;
+		};
+
+		// Implementation of the observable part of the DP observer
+		class IRegistryObservable {
+		public:
+			void notify(const tests_infos_t& infos) const {
+				for (auto& observer : list_observers_) {
+					observer->update(infos);
+				}
+			}
+			void addObserver(const std::shared_ptr<IRegistryObserver>& observer) { list_observers_.insert(observer); }
+			void removeObserver(const std::shared_ptr<IRegistryObserver>& observer) { list_observers_.erase(observer); }
+		private:
+			std::set<std::shared_ptr<IRegistryObserver>> list_observers_;
+		};
+
+		// Manage a registry in a static context
+		class RegistryManager : public IRegistryObservable{
+		public:
+			// Build a registry and fill it in a static context
 			RegistryManager(const std::string& label, registry_storage_t* tests_list, std::initializer_list<std::shared_ptr<test_t>> tests)
-				: run_(false), registry_(label, tests_list) {
+				: run_(false), registry_(label, tests_list)/*, exec_time_ms_accumulator_(duration_t{ 0 })*/ {
 				for (auto& test : tests)
 					push_back(test);
 			}
 
-			void push_back(const std::shared_ptr<test_t>& func) {
-				registry_.get().push_back(std::move(func));
-			}
-
-			Registry* get() { return &registry_; }
-			const Registry* get() const { return &registry_; }
-
+			// Run all the tests
 			void run_tests() {
 				auto tests = registry_.get();
 				for (auto&& test : tests) {
 					test->run();
+					//exec_time_ms_accumulator_ += test->getExecTimeMs();
+					notify(tests_infos_t{ *test });
 					switch (test->getStatus()) {
-					case test_t::PASSED: testsPassed_.push_back(test.get());   break;
-					case test_t::FAILED: testsFailed_.push_back(test.get());   break;
-					case test_t::SKIPPED:testsSkipped_.push_back(test.get());  break;
-					case test_t::ERROR:  testsWithError_.push_back(test.get());break;
+					case test_t::PASSED:
+						tests_passed_.push_back(test.get());
+						break;
+					case test_t::FAILED:
+						tests_failed_.push_back(test.get());
+						break;
+					case test_t::SKIPPED:
+						tests_skipped_.push_back(test.get());
+						break;
+					case test_t::ERROR:
+						tests_with_error_.push_back(test.get());
+						break;
 					default: break;
 					}
 				}
 				run_ = true;
 			}
 
-			size_t getPassedCount() const { return run_ ? testsPassed_.size() : 0; }
-			const std::vector<const test_t*>& getPassedTests() const { return testsPassed_; }
+			// Get informations
+			const std::string& getLabel() const { return get()->getLabel(); }
 
-			size_t getFailedCount() const { return run_ ? testsFailed_.size() : 0; }
-			const std::vector<const test_t*>& getFailedTests() const { return testsFailed_; }
+			size_t getPassedCount() const { return run_ ? tests_passed_.size() : 0; }
+			const std::vector<const test_t*>& getPassedTests() const { return tests_passed_; }
 
-			size_t getSkippedCount() const { return run_ ? testsSkipped_.size() : 0; }
-			const std::vector<const test_t*>& getSkippedTests() const { return testsSkipped_; }
+			size_t getFailedCount() const { return run_ ? tests_failed_.size() : 0; }
+			const std::vector<const test_t*>& getFailedTests() const { return tests_failed_; }
 
-			size_t getWithErrorCount() const { return run_ ? testsWithError_.size() : 0; }
-			const std::vector<const test_t*>& getWithErrorTests() const { return testsWithError_; }
+			size_t getSkippedCount() const { return run_ ? tests_skipped_.size() : 0; }
+			const std::vector<const test_t*>& getSkippedTests() const { return tests_skipped_; }
+
+			size_t getWithErrorCount() const { return run_ ? tests_with_error_.size() : 0; }
+			const std::vector<const test_t*>& getWithErrorTests() const { return tests_with_error_; }
 
 			size_t getAllTestsCount() const { return run_ ? get()->get().size() : 0; }
 			const registry_storage_t& getAllTests() const { return get()->get(); }
+			duration_t getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : duration_t{ 0 }; }
 
 		private:
 
+			void push_back(const std::shared_ptr<test_t>& func) { registry_.get().push_back(std::move(func)); }
+			Registry* get() { return &registry_; }
+			const Registry* get() const { return &registry_; }
+
 			bool run_;
 			Registry registry_;
-			std::vector<const test_t*> testsPassed_;
-			std::vector<const test_t*> testsFailed_;
-			std::vector<const test_t*> testsSkipped_;
-			std::vector<const test_t*> testsWithError_;
+			duration_t exec_time_ms_accumulator_;
+			std::vector<const test_t*> tests_passed_;
+			std::vector<const test_t*> tests_failed_;
+			std::vector<const test_t*> tests_skipped_;
+			std::vector<const test_t*> tests_with_error_;
 
 		};
 	}
@@ -239,16 +345,19 @@ namespace H2OFastTests {
 	*
 	*/
 
+	// Public accessible types
 	using line_info_t = detail::LineInfo;
+	using test_infos_t = detail::tests_infos_t;
 	using registry_storage_t = detail::registry_storage_t;
 	using registry_manager_t = detail::RegistryManager;
+	using registry_observer_t = detail::IRegistryObserver;
 
-	//Interface to Implement to access access a registry information
-	//Possibility to export services into a DLL for forther customization
+	// Interface to Implement to access access a registry information
+	// Possibility to export services into a DLL for forther customization
 	class IRegistryTraversal {
 	public:
 		IRegistryTraversal(const registry_manager_t& registry) : registry_(registry) {}
-		~IRegistryTraversal() {}
+		virtual ~IRegistryTraversal() {}
 	protected:
 		const registry_manager_t& getRegistryManager() const { return registry_; }
 	protected:
@@ -259,41 +368,53 @@ namespace H2OFastTests {
 	class RegistryTraversal_ConsoleIO : private IRegistryTraversal {
 	public:
 		RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
-		std::ostream& print(std::ostream& oss, bool verbose) const {
+		std::ostream& print(std::ostream& os, bool verbose) const {
 			auto& registry_manager = getRegistryManager();
-			oss << "[" << registry_.get()->getLabel() << "] UNIT TEST SUMMARY:" << std::endl;
+			os << "UNIT TEST SUMMARY [" << registry_.getLabel() << "] [" << registry_.getAllTestsExecTimeMs().count() << "ms] :" << std::endl;
 
-			oss << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getPassedTests()) {
-					oss << "\t\t[" << test->getLabel(verbose) << "] PASSED" << std::endl;
+					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl;
 				}
 			}
 
-			oss << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getFailedTests()) {
-					oss << "\t\t[" << test->getLabel(verbose) << "] FAILED: " << test->getFailureReason() << std::endl;
+					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
+						<< "\t\t" << test->getFailureReason() << std::endl;
 				}
 			}
 
-			oss << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getSkippedTests()) {
-					oss << "\t\t[" << test->getLabel(verbose) << "] SKIPPED" << std::endl;
+					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl;
 				}
 			}
 
-			oss << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
 				for (const auto test : registry_.getWithErrorTests()) {
-					oss << "\t\t[" << test->getLabel(verbose) << "] WITH ERROR: " << test->getError() << std::endl;
+					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
+						<< "\t\t" << test->getError() << std::endl;
 				}
 			}
 
-			return oss;
+			return os;
 		}
 	};
+
+	// Observer impl example
+	class ConsoleIO_Observer : public registry_observer_t {
+		virtual void update(const test_infos_t& infos) const {
+			std::cout << (infos.test.getStatus() == test_infos_t::status_t::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
+				<< infos.test.getLabel(false) << "] [" << infos.test.getExecTimeMs().count() << "ms] :" << std::endl
+				<< "Status : " << infos.test.getStatus() << std::endl;
+		}
+	};
+	
 
 	// Assert test class to help verbosing test logic into lambda's impl
 	// Heavily inspired by the eponym MSVC's builtin assert class
@@ -453,6 +574,8 @@ namespace H2OFastTests {
 #define register_scenario(name, description, ...) \
 	static H2OFastTests::registry_storage_t tests_list_ ## name; \
 	static H2OFastTests::registry_manager_t registry_manager_ ## name {description, &tests_list_ ## name, { __VA_ARGS__ } };
+#define register_observer(name, observer_class) \
+	registry_manager_ ## name.addObserver(std::make_shared<observer_class>());
 #define describe_test(test) H2OFastTests::detail::make_test((test))
 #define describe_test_label(label, test) H2OFastTests::detail::make_test(label, (test))
 #define skip_test(test) H2OFastTests::detail::make_skipped_test((test))
