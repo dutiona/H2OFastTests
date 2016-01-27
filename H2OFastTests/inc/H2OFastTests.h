@@ -223,19 +223,20 @@ namespace H2OFastTests {
 		std::shared_ptr<test_t> make_skipped_test(const std::string& reason, std::shared_ptr<test_t>&& test) { return std::make_shared<skipped_test_t>(reason, std::move(*test)); }
 
 		using registry_storage_t = std::deque<std::shared_ptr<test_t>>;
+		using storage_func_t = std::function<registry_storage_t&(void)>;
 
 		// Registry main impl
 		class Registry {
 		public:
 			// Build a registry with a pointer on the static storage as 2nd arg
-			Registry(const std::string& label, registry_storage_t* tests_list) : label_(label), tests_list_(tests_list) {}
+			Registry(const std::string& label, storage_func_t storage_func) : label_(label), storage_func_(storage_func) {}
 			//Getters
-			registry_storage_t& get() { return *tests_list_; };
+			registry_storage_t& get() { return storage_func_(); };
 			const registry_storage_t& get() const { return const_cast<Registry*>(this)->get(); };
 			const std::string& getLabel() const { return label_; }
 		private:
 			std::string label_;
-			registry_storage_t* tests_list_;
+			storage_func_t storage_func_;
 		};
 
 		// POD containing informations about a test
@@ -270,8 +271,8 @@ namespace H2OFastTests {
 		class RegistryManager : public IRegistryObservable{
 		public:
 			// Build a registry and fill it in a static context
-			RegistryManager(const std::string& label, registry_storage_t* tests_list, std::initializer_list<std::shared_ptr<test_t>> tests)
-				: run_(false), registry_(label, tests_list)/*, exec_time_ms_accumulator_(duration_t{ 0 })*/ {
+			RegistryManager(const std::string& label, storage_func_t storage_func, std::initializer_list<std::shared_ptr<test_t>> tests)
+				: run_(false), registry_(label, storage_func)/*, exec_time_ms_accumulator_(duration_t{ 0 })*/ {
 				for (auto& test : tests)
 					push_back(test);
 			}
@@ -548,7 +549,7 @@ namespace H2OFastTests {
 				return;
 			}
 			catch (...) {
-				Assert::Fail(message, pLineInfo);
+				Assert::Fail(message, lineInfo);
 			}
 		}
 
@@ -564,7 +565,7 @@ namespace H2OFastTests {
 				return;
 			}
 			catch (...) {
-				Assert::Fail(message, pLineInfo);
+				Assert::Fail(message, lineInfo);
 			}
 		}
 	};
@@ -572,17 +573,35 @@ namespace H2OFastTests {
 
 //Helper macros to use the unit test suit
 #define register_scenario(name, description, ...) \
-	static H2OFastTests::registry_storage_t tests_list_ ## name; \
-	static H2OFastTests::registry_manager_t registry_manager_ ## name {description, &tests_list_ ## name, { __VA_ARGS__ } };
-#define register_observer(name, observer_class) \
-	registry_manager_ ## name.addObserver(std::make_shared<observer_class>());
-#define describe_test(test) H2OFastTests::detail::make_test((test))
-#define describe_test_label(label, test) H2OFastTests::detail::make_test(label, (test))
-#define skip_test(test) H2OFastTests::detail::make_skipped_test((test))
-#define skip_test_reason(reason, test) H2OFastTests::detail::make_skipped_test(reason, (test))
-#define run_scenario(name) registry_manager_ ## name.run_tests();
-#define print_result(name, verbose) H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager_ ## name).print(std::cout, (verbose))
-#define line_info() &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
-#define line_info_f() &H2OFastTests::line_info_t(__FILE__, __FUNCTION__, __LINE__)
+	namespace H2OFastTests { \
+		registry_storage_t& get_registry_storage_ ## name() { \
+			static registry_storage_t registry_storage; \
+			return registry_storage; \
+		} \
+		static registry_manager_t registry_manager_ ## name {description, &get_registry_storage_ ## name, { __VA_ARGS__ } }; \
+	}
+#define run_scenario(name) \
+	H2OFastTests::registry_manager_ ## name.run_tests();
+
+#define describe_test(test) \
+	H2OFastTests::detail::make_test((test))
+#define describe_test_label(label, test) \
+	H2OFastTests::detail::make_test(label, (test))
+
+#define skip_test(test) \
+	H2OFastTests::detail::make_skipped_test((test))
+#define skip_test_reason(reason, test) \
+	H2OFastTests::detail::make_skipped_test(reason, (test))
+
+#define register_observer(name, class_name, instance_ptr) \
+	H2OFastTests::registry_manager_ ## name.addObserver(std::shared_ptr<class_name>(instance_ptr));
+
+#define print_result(name, verbose) \
+	H2OFastTests::RegistryTraversal_ConsoleIO(H2OFastTests::registry_manager_ ## name).print(std::cout, (verbose))
+
+#define line_info() \
+	&H2OFastTests::line_info_t(__FILE__, "", __LINE__)
+#define line_info_f() \
+	&H2OFastTests::line_info_t(__FILE__, __FUNCTION__, __LINE__)
 
 #endif
