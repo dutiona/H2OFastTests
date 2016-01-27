@@ -1,6 +1,6 @@
 /*
  *
- *  (C) Copyright 2016 Michaël Roynard
+ *  (C) Copyright 2016 MichaÃ«l Roynard
  *
  *  Distributed under the MIT License, Version 1.0. (See accompanying
  *  file LICENSE or copy at https://opensource.org/licenses/MIT)
@@ -129,7 +129,6 @@ namespace H2OFastTests {
 
 		private:
 
-			// NVI for public interface
 			void run() { run_private(); }
 
 			// Run the test and capture and set the state
