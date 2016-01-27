@@ -58,12 +58,13 @@ namespace H2OFastTests {
 			const std::string message_;
 		};
 
+
 		// Internal impl for processing an assert and raise the TestFailure Exception
 		void FailOnCondition(bool condition, const char* message = nullptr, const LineInfo* lineInfo = nullptr) {
+			std::ostringstream oss;
 			if (!condition) {
-				std::ostringstream oss;
 				if (lineInfo != nullptr) {
-					oss << *lineInfo << std::endl << ((message != nullptr) ? message : "");
+					oss << ((message != nullptr) ? message : "") << "\t(" << *lineInfo << ")";
 				}
 				else {
 					oss << ((message != nullptr) ? message : "");
@@ -174,19 +175,19 @@ namespace H2OFastTests {
 
 		std::ostream& operator<<(std::ostream& os, test_t::Status status) {
 			switch (status)	{
-			case H2OFastTests::detail::Test::PASSED:
+			case test_t::PASSED:
 				os << "PASSED";
 				break;
-			case H2OFastTests::detail::Test::FAILED:
+			case test_t::FAILED:
 				os << "FAILED";
 				break;
-			case H2OFastTests::detail::Test::ERROR:
+			case test_t::ERROR:
 				os << "ERROR";
 				break;
-			case H2OFastTests::detail::Test::SKIPPED:
+			case test_t::SKIPPED:
 				os << "SKIPPED";
 				break;
-			case H2OFastTests::detail::Test::NONE:
+			case test_t::NONE:
 			default:
 				os << "NOT RUN YET";
 				break;
@@ -280,7 +281,7 @@ namespace H2OFastTests {
 			// Run all the tests
 			void run_tests() {
 				auto tests = registry_.get();
-				for (auto&& test : tests) {
+				for (auto& test : tests) {
 					test->run();
 					//exec_time_ms_accumulator_ += test->getExecTimeMs();
 					notify(tests_infos_t{ *test });
@@ -371,7 +372,7 @@ namespace H2OFastTests {
 		RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
 		std::ostream& print(std::ostream& os, bool verbose) const {
 			auto& registry_manager = getRegistryManager();
-			os << "UNIT TEST SUMMARY [" << registry_.getLabel() << "] [" << registry_.getAllTestsExecTimeMs().count() << "ms] :" << std::endl;
+			os << "UNIT TEST SUMMARY [" << registry_.getLabel() << "] [" << registry_.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
 
 			os << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
 			if (verbose) {
@@ -384,7 +385,7 @@ namespace H2OFastTests {
 			if (verbose) {
 				for (const auto test : registry_.getFailedTests()) {
 					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
-						<< "\t\t" << test->getFailureReason() << std::endl;
+						<< "\t\tMessage: " << test->getFailureReason() << std::endl;
 				}
 			}
 
@@ -399,7 +400,7 @@ namespace H2OFastTests {
 			if (verbose) {
 				for (const auto test : registry_.getWithErrorTests()) {
 					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
-						<< "\t\t" << test->getError() << std::endl;
+						<< "\t\tMessage: " << test->getError() << std::endl;
 				}
 			}
 
@@ -411,8 +412,8 @@ namespace H2OFastTests {
 	class ConsoleIO_Observer : public registry_observer_t {
 		virtual void update(const test_infos_t& infos) const {
 			std::cout << (infos.test.getStatus() == test_infos_t::status_t::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
-				<< infos.test.getLabel(false) << "] [" << infos.test.getExecTimeMs().count() << "ms] :" << std::endl
-				<< "Status : " << infos.test.getStatus() << std::endl;
+				<< infos.test.getLabel(false) << "] [" << infos.test.getExecTimeMs().count() << "ms]:" << std::endl
+				<< "Status: " << infos.test.getStatus() << std::endl;
 		}
 	};
 	
@@ -467,7 +468,8 @@ namespace H2OFastTests {
 		}
 
 		// Generic AreNotEqual comparison:
-		template<typename T> static void AreNotEqual(const T& notExpected, const T& actual,
+		template<typename T>
+		static void AreNotEqual(const T& notExpected, const T& actual,
 			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			detail::FailOnCondition(!(notExpected == actual), message, lineInfo);
 		}
@@ -510,13 +512,15 @@ namespace H2OFastTests {
 		}
 
 		// Verify that a pointer is NULL:
-		template<typename T> static void IsNull(const T* actual,
+		template<typename T>
+		static void IsNull(const T* actual,
 			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			detail::FailOnCondition(actual == nullptr, message, lineInfo);
 		}
 
 		// Verify that a pointer is not NULL:
-		template<typename T> static void IsNotNull(const T* actual,
+		template<typename T>
+		static void IsNotNull(const T* actual,
 			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			detail::FailOnCondition(actual != nullptr, message, lineInfo);
 		}
@@ -549,14 +553,14 @@ namespace H2OFastTests {
 				return;
 			}
 			catch (...) {
-				Assert::Fail(message, lineInfo);
+				Fail(message, lineInfo);
 			}
 		}
 
 		template<typename ExpectedException, typename ReturnType>
 		static void ExpectException(ReturnType(*func)(),
 			const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-			Assert::IsNotNull(func, message, lineInfo);
+			IsNotNull(func, message, lineInfo);
 
 			try {
 				func();
@@ -565,7 +569,7 @@ namespace H2OFastTests {
 				return;
 			}
 			catch (...) {
-				Assert::Fail(message, lineInfo);
+				Fail(message, lineInfo);
 			}
 		}
 	};
