@@ -325,7 +325,6 @@ namespace H2OFastTests {
 		private:
 
 			void push_back(const std::shared_ptr<test_t>& func) { registry_.get().push_back(std::move(func)); }
-			Registry* get() { return &registry_; }
 			const Registry* get() const { return &registry_; }
 
 			bool run_;
