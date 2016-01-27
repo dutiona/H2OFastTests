@@ -272,7 +272,7 @@ namespace H2OFastTests {
 		public:
 			// Build a registry and fill it in a static context
 			RegistryManager(const std::string& label, storage_func_t storage_func, std::initializer_list<std::shared_ptr<test_t>> tests)
-				: run_(false), registry_(label, storage_func)/*, exec_time_ms_accumulator_(duration_t{ 0 })*/ {
+				: run_(false), registry_(label, storage_func), exec_time_ms_accumulator_(duration_t{ 0 }) {
 				for (auto& test : tests)
 					push_back(test);
 			}
@@ -282,7 +282,7 @@ namespace H2OFastTests {
 				auto tests = registry_.get();
 				for (auto& test : tests) {
 					test->run();
-					//exec_time_ms_accumulator_ += test->getExecTimeMs();
+					exec_time_ms_accumulator_ += test->getExecTimeMs();
 					notify(tests_infos_t{ *test });
 					switch (test->getStatus()) {
 					case test_t::PASSED:
