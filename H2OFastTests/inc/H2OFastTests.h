@@ -277,6 +277,8 @@ namespace H2OFastTests {
 					push_back(test);
 			}
 
+			void push_back(const std::shared_ptr<test_t>& func) { registry_.get().push_back(std::move(func)); }
+			
 			// Run all the tests
 			void run_tests() {
 				auto tests = registry_.get();
@@ -324,7 +326,6 @@ namespace H2OFastTests {
 
 		private:
 
-			void push_back(const std::shared_ptr<test_t>& func) { registry_.get().push_back(std::move(func)); }
 			const Registry* get() const { return &registry_; }
 
 			bool run_;
@@ -594,6 +595,9 @@ namespace H2OFastTests {
 	H2OFastTests::detail::make_skipped_test((test))
 #define skip_test_reason(reason, test) \
 	H2OFastTests::detail::make_skipped_test(reason, (test))
+
+#define add_test_to_scenario(name, made_test) \
+	H2OFastTests::registry_manager_ ## name.push_back(made_test);
 
 #define register_observer(name, class_name, instance_ptr) \
 	H2OFastTests::registry_manager_ ## name.addObserver(std::shared_ptr<class_name>(instance_ptr));
