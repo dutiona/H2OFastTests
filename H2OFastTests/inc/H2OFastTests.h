@@ -96,17 +96,17 @@ namespace H2OFastTests {
 			Test(const test_func_t&& test) : Test("", std::move(test)) {}
 			Test(const std::string& label) : Test(label, []() {}) {}
 			Test(const std::string& label, const test_func_t&& test)
-				: label_(label), status_(NONE), test_holder_(std::make_shared<test_func_t>(std::move(test)))
+				: label_(label), status_(NONE), test_holder_(std::make_unique<test_func_t>(std::move(test)))
 			{}
 
 			// Default move impl (for VC2013)
 			Test(Test&& test)
-				: test_holder_(test.test_holder_),
+				: test_holder_(std::move(test.test_holder_)),
 				label_(test.label_), status_(test.status_), exec_time_ms_(test.exec_time_ms_),
 				failure_reason_(test.failure_reason_), skipped_reason_(test.skipped_reason_), error_(test.error_)
 			{}
 			Test&& operator=(Test&& test) {
-				test_holder_ = test.test_holder_;
+				test_holder_ = std::move(test.test_holder_);
 				label_ = test.label_;
 				status_ = test.status_;
 				exec_time_ms_ = test.exec_time_ms_;
@@ -160,7 +160,7 @@ namespace H2OFastTests {
 		protected:
 
 			duration_t exec_time_ms_;
-			std::shared_ptr<test_func_t> test_holder_;
+			std::unique_ptr<test_func_t> test_holder_;
 			std::string label_;
 			std::string failure_reason_;
 			std::string skipped_reason_;
