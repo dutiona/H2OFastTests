@@ -301,6 +301,16 @@ namespace H2OFastTests {
 				push_back(std::move(func));
 				push_back(std::forward<Args>(tests_or_funcs)...);
 			}
+
+			template<class BadArgument, class ... Args>
+			void push_back(BadArgument&& unknown_typed_arg, Args&& ... tests_or_funcs) {
+				// TODO : decide to eigther crach at compile time
+				static_assert(false, "Unknown type passed to initialize test registry.");
+				// or print a warning
+				//std::cerr << "Ignoring bad type passed to initialize test registry." << std::endl;
+				// orsilently ignore
+				//push_back(std::forward<Args>(tests_or_funcs)...);
+			}
 			
 			// Run all the tests
 			void run_tests() {

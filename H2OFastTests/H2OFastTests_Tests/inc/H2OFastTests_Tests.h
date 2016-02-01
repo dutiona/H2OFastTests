@@ -28,10 +28,6 @@ bool operator==(const CustomClass& lhs, const CustomClass& rhs) {
 
 register_scenario(H2OFastTests_Tests, "Tests case scenario for H2OFastTests lib",
 
-	[](){
-		Assert::IsTrue(true);
-	},
-
 	describe_test("Assert::AreEqual(double, tolerance = 1e-5)", [](){
 		Assert::AreEqual(0., 1e-5, 1e-5, "Expect 0. == 1e-5", line_info());
 	}),
