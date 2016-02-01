@@ -99,6 +99,10 @@ namespace H2OFastTests {
 				: label_(label), status_(NONE), test_holder_(std::make_unique<test_func_t>(std::move(test)))
 			{}
 
+			// Copy forbidden
+			Test(const Test&) = delete;
+			Test& operator=(const Test&) = delete;
+
 			// Default move impl (for VC2013)
 			Test(Test&& test)
 				: test_holder_(std::move(test.test_holder_)),
@@ -214,15 +218,14 @@ namespace H2OFastTests {
 		using skipped_test_t = detail::SkippedTest;
 
 		// Helper functions to build/skip a test case
-		std::shared_ptr<test_t> make_test(test_func_t&& func) { return std::make_shared<test_t>(std::move(func)); }
-		std::shared_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return std::make_shared<test_t>(label, std::move(func)); }
-		std::shared_ptr<test_t> make_test(std::shared_ptr<test_t>&& test) { return test; }
-		std::shared_ptr<test_t> make_skipped_test(test_t&& test) { return std::make_shared<skipped_test_t>(std::move(test)); }
-		std::shared_ptr<test_t> make_skipped_test(const std::string& reason, test_t&& test) { return std::make_shared<skipped_test_t>(reason, std::move(test)); }
-		std::shared_ptr<test_t> make_skipped_test(std::shared_ptr<test_t>&& test) { return std::make_shared<skipped_test_t>(std::move(*test)); }
-		std::shared_ptr<test_t> make_skipped_test(const std::string& reason, std::shared_ptr<test_t>&& test) { return std::make_shared<skipped_test_t>(reason, std::move(*test)); }
+		test_t make_test(test_func_t&& func) { return std::move(test_t{ std::move(func) }); }
+		test_t make_test(const std::string& label, test_func_t&& func) { return std::move(test_t{ label, std::move(func) }); }
+		test_t make_skipped_test(test_t&& test) { return std::move(skipped_test_t{ std::move(test) }); }
+		test_t make_skipped_test(const std::string& reason, test_t&& test) { return std::move(skipped_test_t{ reason, std::move(test) }); }
+		test_t make_skipped_test(test_func_t&& func) { return std::move(skipped_test_t{ std::move(make_test(std::move(func))) }); }
+		test_t make_skipped_test(const std::string& reason, test_func_t&& func) { return std::move(skipped_test_t{ reason, std::move(make_test(std::move(func))) }); }
 
-		using registry_storage_t = std::deque<std::shared_ptr<test_t>>;
+		using registry_storage_t = std::deque<test_t>;
 		using storage_func_t = std::function<registry_storage_t&(void)>;
 
 		// Registry main impl
@@ -270,34 +273,54 @@ namespace H2OFastTests {
 		// Manage a registry in a static context
 		class RegistryManager : public IRegistryObservable{
 		public:
+
 			// Build a registry and fill it in a static context
-			RegistryManager(const std::string& label, storage_func_t storage_func, std::initializer_list<std::shared_ptr<test_t>> tests)
+			template<class ... Args>
+			RegistryManager(const std::string& label, storage_func_t storage_func, Args&& ... tests_or_funcs)
 				: run_(false), registry_(label, storage_func), exec_time_ms_accumulator_(duration_t{ 0 }) {
-				for (auto& test : tests)
-					push_back(test);
+				push_back(std::forward<Args>(tests_or_funcs)...);
 			}
 
-			void push_back(const std::shared_ptr<test_t>& func) { registry_.get().push_back(std::move(func)); }
+			//Recursive variadic to iterate over the test pack
+			void push_back(test_t&& test) {
+				registry_.get().push_back(std::move(test));
+			}
+
+			template<class ... Args>
+			void push_back(test_t&& test, Args&& ... tests_or_funcs) {
+				push_back(std::move(test));
+				push_back(std::forward<Args>(tests_or_funcs)...);
+			}
+
+			void push_back(test_func_t&& func) {
+				registry_.get().push_back(std::move(make_test(std::move(func))));
+			}
+
+			template<class ... Args>
+			void push_back(test_func_t&& func, Args&& ... tests_or_funcs) {
+				push_back(std::move(func));
+				push_back(std::forward<Args>(tests_or_funcs)...);
+			}
 			
 			// Run all the tests
 			void run_tests() {
-				auto tests = registry_.get();
+				auto& tests = registry_.get();
 				for (auto& test : tests) {
-					test->run();
-					exec_time_ms_accumulator_ += test->getExecTimeMs();
-					notify(tests_infos_t{ *test });
-					switch (test->getStatus()) {
+					test.run();
+					exec_time_ms_accumulator_ += test.getExecTimeMs();
+					notify(tests_infos_t{ test });
+					switch (test.getStatus()) {
 					case test_t::PASSED:
-						tests_passed_.push_back(test.get());
+						tests_passed_.push_back(&test);
 						break;
 					case test_t::FAILED:
-						tests_failed_.push_back(test.get());
+						tests_failed_.push_back(&test);
 						break;
 					case test_t::SKIPPED:
-						tests_skipped_.push_back(test.get());
+						tests_skipped_.push_back(&test);
 						break;
 					case test_t::ERROR:
-						tests_with_error_.push_back(test.get());
+						tests_with_error_.push_back(&test);
 						break;
 					default: break;
 					}
@@ -581,14 +604,12 @@ namespace H2OFastTests {
 			static registry_storage_t registry_storage; \
 			return registry_storage; \
 		} \
-		static registry_manager_t registry_manager_ ## name {description, &get_registry_storage_ ## name, { __VA_ARGS__ } }; \
+		static registry_manager_t registry_manager_ ## name {description, &get_registry_storage_ ## name, __VA_ARGS__ }; \
 	}
 #define run_scenario(name) \
 	H2OFastTests::registry_manager_ ## name.run_tests();
 
-#define describe_test(test) \
-	H2OFastTests::detail::make_test((test))
-#define describe_test_label(label, test) \
+#define describe_test(label, test) \
 	H2OFastTests::detail::make_test(label, (test))
 
 #define skip_test(test) \
