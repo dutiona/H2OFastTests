@@ -29,11 +29,11 @@ bool operator==(const CustomClass& lhs, const CustomClass& rhs) {
 register_scenario(H2OFastTests_Tests, "Tests case scenario for H2OFastTests lib",
 
 	describe_test("Assert::AreEqual(double, tolerance = 1e-5)", [](){
-		Assert::AreEqual(0., 1e-5, 1e-5, "Expect 0. == 1e-5", line_info());
+		AssertThat(0.).isEqualTo(1e-5, 1e-5, "Expect 0. == 1e-5", line_info());
 	}),
 
 	describe_test("Assert::AreNotEqual(double, tolerance = 1e-5)", [](){
-		Assert::AreNotEqual(0., 10e-5, 1e-5, "Expect 0. != 10e-5", line_info());
+		AssertThat(0.).isNotEqualTo(10e-5, 1e-5, "Expect 0. != 10e-5", line_info());
 	}),
 
 	describe_test("Assert::AreEqual(float, tolerance = 1e-5)", [](){
