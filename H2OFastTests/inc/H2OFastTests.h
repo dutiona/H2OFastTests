@@ -137,7 +137,7 @@ namespace H2OFastTests {
 			duration_t getExecTimeMs() const { return getExecTimeMs_private(); }
 			Status getStatus() const { return getStatus_private(); }
 
-		private:
+		protected:
 
 			void run() { run_private(); } // Called by RegistryManager
 
@@ -215,7 +215,7 @@ namespace H2OFastTests {
 				skipped_reason_ = reason;
 			}
 
-		private:
+		protected:
 
 			// Put state to skipped and don't run the test
 			virtual void run_private() { status_ = SKIPPED; }
