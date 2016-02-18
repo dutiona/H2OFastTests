@@ -17,6 +17,7 @@
 #include <chrono>
 #include <functional>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <set>
 #include <sstream>
@@ -232,26 +233,6 @@ namespace H2OFastTests {
 		test_t make_skipped_test(test_func_t&& func) { return skipped_test_t{ std::move(make_test(std::move(func))) }; }
 		test_t make_skipped_test(const std::string& reason, test_func_t&& func) { return skipped_test_t{ reason, std::move(make_test(std::move(func))) }; }
 
-		using registry_storage_t = std::vector<test_t>;
-		using storage_func_t = std::function<registry_storage_t&(void)>;
-
-		// Registry main impl
-		class Registry {
-		public:
-			// Build a registry with a pointer on the static storage as 2nd arg
-			Registry(const std::string& label, storage_func_t storage_func)
-				: label_(label), storage_func_(storage_func) {}
-			//Getters
-			registry_storage_t& get() { return storage_func_(); };
-			const registry_storage_t& get() const { return const_cast<Registry*>(this)->get(); };
-			const std::string& getLabel() const { return label_; }
-		private:
-			std::string label_;
-			storage_func_t storage_func_;
-		};
-
-		using registry_t = Registry;
-
 		// POD containing informations about a test
 		struct TestInfos {
 			const test_t& test;
@@ -284,20 +265,30 @@ namespace H2OFastTests {
 
 		using registry_observable_t = IRegistryObservable;
 
+		// Global static registry storage object
+		using test_list_t = std::vector<test_t>;
+		using registry_storage_t = std::map<std::string, test_list_t>;
+
+		registry_storage_t& get_registry() {
+			static registry_storage_t registry;
+			return registry;
+		}
+
 		// Manage a registry in a static context
 		class RegistryManager : public registry_observable_t{
 		public:
 
 			// Build a registry and fill it in a static context
 			template<class ... Args>
-			RegistryManager(const std::string& label, storage_func_t storage_func, Args&& ... tests_or_funcs)
-				: run_(false), registry_(label, storage_func), exec_time_ms_accumulator_(duration_t{ 0 }) {
+			RegistryManager(const std::string& label, Args&& ... tests_or_funcs)
+				: run_(false), label_(label), exec_time_ms_accumulator_(duration_t{ 0 }) {
+				get_registry().emplace(label, test_list_t{});
 				push_back(std::forward<Args>(tests_or_funcs)...);
 			}
 
 			//Recursive variadic to iterate over the test pack
 			void push_back(test_t&& test) {
-				registry_.get().push_back(std::move(test));
+				get_registry()[label_].push_back(std::move(test));
 			}
 
 			template<class ... Args>
@@ -307,7 +298,7 @@ namespace H2OFastTests {
 			}
 
 			void push_back(test_func_t&& func) {
-				registry_.get().push_back(std::move(make_test(std::move(func))));
+				get_registry()[label_].push_back(std::move(make_test(std::move(func))));
 			}
 
 			template<class ... Args>
@@ -328,7 +319,7 @@ namespace H2OFastTests {
 
 			// Run all the tests
 			void run_tests() {
-				auto& tests = registry_.get();
+				auto& tests = get_registry()[label_];
 				for (auto& test : tests) {
 					test.run();
 					exec_time_ms_accumulator_ += test.getExecTimeMs();
@@ -353,7 +344,7 @@ namespace H2OFastTests {
 			}
 
 			// Get informations
-			const std::string& getLabel() const { return get()->getLabel(); }
+			const std::string& getLabel() const { return label_; }
 
 			size_t getPassedCount() const { return run_ ? tests_passed_.size() : 0; }
 			const std::vector<const test_t*>& getPassedTests() const { return tests_passed_; }
@@ -367,16 +358,14 @@ namespace H2OFastTests {
 			size_t getWithErrorCount() const { return run_ ? tests_with_error_.size() : 0; }
 			const std::vector<const test_t*>& getWithErrorTests() const { return tests_with_error_; }
 
-			size_t getAllTestsCount() const { return run_ ? get()->get().size() : 0; }
-			const registry_storage_t& getAllTests() const { return get()->get(); }
+			size_t getAllTestsCount() const { return run_ ? get_registry()[label_].size() : 0; }
+			const test_list_t& getAllTests() const { return get_registry()[label_]; }
 			duration_t getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : duration_t{ 0 }; }
 
 		private:
 
-			const registry_t* get() const { return &registry_; }
-
 			bool run_;
-			registry_t registry_;
+			std::string label_;
 			duration_t exec_time_ms_accumulator_;
 			std::vector<const test_t*> tests_passed_;
 			std::vector<const test_t*> tests_failed_;
@@ -713,14 +702,8 @@ namespace H2OFastTests {
 }
 
 //Helper macros to use the unit test suit
-#define register_scenario(name, description, ...) \
-	namespace H2OFastTests { \
-		registry_storage_t& get_registry_storage_ ## name() { \
-			static registry_storage_t registry_storage; \
-			return registry_storage; \
-		} \
-		static registry_manager_t registry_manager_ ## name {description, &get_registry_storage_ ## name, __VA_ARGS__ }; \
-	}
+#define register_scenario(name, label, ...) \
+	namespace H2OFastTests { static registry_manager_t registry_manager_ ## name {label, __VA_ARGS__ }; }
 #define run_scenario(name) \
 	H2OFastTests::registry_manager_ ## name.run_tests();
 
