@@ -10,11 +10,14 @@
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
+[Rr]el[Ww]ith[Dd]eb[Ii]nfo/
 x64/
 build/
 bld/
 [Bb]in/
 [Oo]bj/
+VS2013_*/
+
 
 # Roslyn cache directories
 *.ide/
