@@ -84,9 +84,14 @@ namespace H2OFastTests {
 
 			using empty_expression_t = AsserterExpression<nullptr_t>;
 
+			template<class Expr>
+			friend AsserterExpression<Expr> AssertThat(Expr&& expr);
+
 			AsserterExpression()
-				: expr_(nullptr) {}
-			AsserterExpression(Expr&& expr)
+				: expr_(nullptr)
+			{}
+
+			AsserterExpression(Expr&& expr) // Expr must be copyable or movable
 				: expr_(std::forward<Expr>(expr))
 			{}
 
@@ -95,13 +100,13 @@ namespace H2OFastTests {
 				return{ std::forward<NewExpr>(expr) };
 			}
 
-			// Verify that a condition is true:
+			// True condition
 			empty_expression_t isTrue(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				FailureTest(expr_, message, lineInfo);
 				return{};
 			}
 
-			// Verify that a conditon is false:
+			// False condition
 			empty_expression_t isFalse(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				FailureTest(!expr_, message, lineInfo);
 				return{};
@@ -123,19 +128,19 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// Verify that a pointer is NULL:
+			// Verify that a pointer is nullptr:
 			empty_expression_t isNull(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				FailureTest(expr_ == nullptr, message, lineInfo);
 				return{};
 			}
 
-			// Verify that a pointer is not NULL:
+			// Verify that a pointer is not nullptr:
 			empty_expression_t isNotNull(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				FailureTest(expr_ != nullptr, message, lineInfo);
 				return{};
 			}
 
-			// Force the test case result to be Failed:
+			// Force the test case result to be fail:
 			empty_expression_t fail(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				FailureTest(false, message, lineInfo);
 				return{};
@@ -156,7 +161,7 @@ namespace H2OFastTests {
 				return fail(message, lineInfo);
 			}
 
-			// Verify that two objects are equal.
+			// Invoque operator == on T
 			template<class T>
 			empty_expression_t isEqualTo(const T& expected,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
@@ -164,7 +169,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// double equality comparison:
+			// Check if 2 doubles are almost equals (tolerance given)
 			empty_expression_t isEqualTo(double expected, double tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				double diff = expected - expr_;
@@ -172,7 +177,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// float equality comparison:
+			// Check if 2 floats are almost equals (tolerance given)
 			empty_expression_t isEqualTo(float expected, float tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				float diff = expected - expr_;
@@ -180,7 +185,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// char* string equality comparison:
+			// Check if 2 char* are equals, considering the case by default
 			empty_expression_t isEqualTo(const char* expected, bool ignoreCase = false,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				auto expected_str = std::string{ expected };
@@ -193,7 +198,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// char* string equality comparison:
+			// Check if 2 strings are equals, considering the case by default
 			empty_expression_t isEqualTo(std::string expected, bool ignoreCase = false,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				if (ignoreCase) {
@@ -204,7 +209,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// Generic AreNotEqual comparison:
+			// Invoque !operator == on T
 			template<class T>
 			empty_expression_t isNotEqualTo(const T& notExpected,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
@@ -212,7 +217,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// double AreNotEqual comparison:
+			// Check if 2 doubles are not almost equals (tolerance given)
 			empty_expression_t isNotEqualTo(double notExpected, double tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				double diff = notExpected - expr_;
@@ -220,7 +225,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// float AreNotEqual comparison:
+			// Check if 2 floats are not almost equals (tolerance given)
 			empty_expression_t isNotEqualTo(float notExpected, float expr_, float tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				float diff = notExpected - expr_;
@@ -228,7 +233,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// char* string AreNotEqual comparison:
+			// Check if 2 char* are not equals, considering the case by default
 			empty_expression_t isNotEqualTo(const char* notExpected, bool ignoreCase = false,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				auto notExpected_str = std::string{ notExpected };
@@ -241,7 +246,7 @@ namespace H2OFastTests {
 				return{};
 			}
 
-			// wchar_t* string AreNotEqual comparison with char* message:
+			// Check if 2 strings are not equals, considering the case by default
 			empty_expression_t isNotEqualTo(std::string notExpected, bool ignoreCase = false,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				if (ignoreCase) {
@@ -253,7 +258,9 @@ namespace H2OFastTests {
 			}
 
 		private:
-			Expr expr_;
+
+			Expr expr_; // Current value stored
+
 		};
 
 		// Functor to build an Asserter with template deduction
@@ -275,10 +282,10 @@ namespace H2OFastTests {
 				PASSED,	// test successfuly passed
 				FAILED,	// test failed to pass (an assert failed)
 				ERROR,	// an error occured during the test :
-				// any exception was catched like bad_alloc
+						// any exception was catched like bad_alloc
 				SKIPPED,// test was skipped and not run
 				NONE	// the run_scenario function wasn't run yet
-				// for the scenario holding the test
+						// for the scenario holding the test
 			};
 
 			// All available constructors
