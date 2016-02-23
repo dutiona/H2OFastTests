@@ -64,7 +64,7 @@ namespace H2OFastTests {
 		using test_failure_t = TestFailure;
 
 		// Internal impl for processing an assert and raise the TestFailure Exception
-		void FailOnCondition(bool condition, const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+		void FailureTest(bool condition, const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 			std::ostringstream oss;
 			if (!condition) {
 				if (lineInfo != nullptr) {
@@ -76,6 +76,192 @@ namespace H2OFastTests {
 				throw test_failure_t(oss.str());
 			}
 		}
+
+		// Assert test class to help verbosing test logic into lambda's impl
+		template<class Expr>
+		class AsserterExpression {
+		public:
+
+			using empty_expression_t = AsserterExpression<nullptr_t>;
+
+			AsserterExpression()
+				: expr_(nullptr) {}
+			AsserterExpression(Expr&& expr)
+				: expr_(std::forward<Expr>(expr))
+			{}
+
+			template<class NewExpr>
+			AsserterExpression<NewExpr> andThat(NewExpr&& expr) {
+				return{ std::forward<NewExpr>(expr) };
+			}
+
+			// Verify that a condition is true:
+			empty_expression_t isTrue(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(expr_, message, lineInfo);
+				return{};
+			}
+
+			// Verify that a conditon is false:
+			empty_expression_t isFalse(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(!expr_, message, lineInfo);
+				return{};
+			}
+
+			// Verify that two references refer to the same object instance (identity):
+			template<class T>
+			empty_expression_t isSameAs(const T& actual,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(&expr_ == &actual, message, lineInfo);
+				return{};
+			}
+
+			// Verify that two references do not refer to the same object instance (identity):
+			template<class T>
+			empty_expression_t isNotSameAs(const T& actual,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(!(&expr_ == &actual), message, lineInfo);
+				return{};
+			}
+
+			// Verify that a pointer is NULL:
+			empty_expression_t isNull(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(expr_ == nullptr, message, lineInfo);
+				return{};
+			}
+
+			// Verify that a pointer is not NULL:
+			empty_expression_t isNotNull(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(expr_ != nullptr, message, lineInfo);
+				return{};
+			}
+
+			// Force the test case result to be Failed:
+			empty_expression_t fail(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(false, message, lineInfo);
+				return{};
+			}
+
+			// Verify that a function raises an exception:
+			template<class ExpectedException>
+			empty_expression_t expectException(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				try {
+					expr_();
+				}
+				catch (ExpectedException) {
+					return{};
+				}
+				catch (...) {
+					return fail(message, lineInfo);
+				}
+				return fail(message, lineInfo);
+			}
+
+			// Verify that two objects are equal.
+			template<class T>
+			empty_expression_t isEqualTo(const T& expected,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(expr_ == expected, message, lineInfo);
+				return{};
+			}
+
+			// double equality comparison:
+			empty_expression_t isEqualTo(double expected, double tolerance,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				double diff = expected - expr_;
+				FailureTest(fabs(diff) <= fabs(tolerance), message, lineInfo);
+				return{};
+			}
+
+			// float equality comparison:
+			empty_expression_t isEqualTo(float expected, float tolerance,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				float diff = expected - expr_;
+				FailureTest(fabs(diff) <= fabs(tolerance), message, lineInfo);
+				return{};
+			}
+
+			// char* string equality comparison:
+			empty_expression_t isEqualTo(const char* expected, bool ignoreCase = false,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				auto expected_str = std::string{ expected };
+				auto expr_str = std::string{ expr_ };
+				if (ignoreCase) {
+					std::transform(expected_str.begin(), expected_str.end(), expected_str.begin(), ::tolower);
+					std::transform(expr_str.begin(), expr_str.end(), expr_str.begin(), ::tolower);
+				}
+				FailureTest(expected_str == expr_str, message, lineInfo);
+				return{};
+			}
+
+			// char* string equality comparison:
+			empty_expression_t isEqualTo(std::string expected, bool ignoreCase = false,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				if (ignoreCase) {
+					std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
+					std::transform(expr_.begin(), expr_.end(), expr_.begin(), ::tolower);
+				}
+				FailureTest(expected == expr_, message, lineInfo);
+				return{};
+			}
+
+			// Generic AreNotEqual comparison:
+			template<class T>
+			empty_expression_t isNotEqualTo(const T& notExpected,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				FailureTest(!(notExpected == expr_), message, lineInfo);
+				return{};
+			}
+
+			// double AreNotEqual comparison:
+			empty_expression_t isNotEqualTo(double notExpected, double tolerance,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				double diff = notExpected - expr_;
+				FailureTest(fabs(diff) > fabs(tolerance), message, lineInfo);
+				return{};
+			}
+
+			// float AreNotEqual comparison:
+			empty_expression_t isNotEqualTo(float notExpected, float expr_, float tolerance,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				float diff = notExpected - expr_;
+				FailureTest(fabs(diff) > fabs(tolerance), message, lineInfo);
+				return{};
+			}
+
+			// char* string AreNotEqual comparison:
+			empty_expression_t isNotEqualTo(const char* notExpected, bool ignoreCase = false,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				auto notExpected_str = std::string{ notExpected };
+				auto expr_str = std::string{ expr_ };
+				if (ignoreCase) {
+					std::transform(notExpected_str.begin(), notExpected_str.end(), notExpected_str.begin(), ::tolower);
+					std::transform(expr_str.begin(), expr_str.end(), expr_str.begin(), ::tolower);
+				}
+				FailureTest(notExpected_str != expr_str, message, lineInfo);
+				return{};
+			}
+
+			// wchar_t* string AreNotEqual comparison with char* message:
+			empty_expression_t isNotEqualTo(std::string notExpected, bool ignoreCase = false,
+				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+				if (ignoreCase) {
+					std::transform(notExpected.begin(), notExpected.end(), notExpected.begin(), ::tolower);
+					std::transform(expr_.begin(), expr_.end(), expr_.begin(), ::tolower);
+				}
+				FailureTest(notExpected != expr_, message, lineInfo);
+				return{};
+			}
+
+		private:
+			Expr expr_;
+		};
+
+		// Functor to build an Asserter with template deduction
+		template<class Expr>
+		AsserterExpression<Expr> AssertThat(Expr&& expr) {
+			return{ std::forward<Expr>(expr) };
+		}
+
 
 		using test_func_t = std::function<void(void)>;
 		using duration_t = std::chrono::duration<double, std::milli>; // ms
@@ -375,165 +561,7 @@ namespace H2OFastTests {
 		};
 
 		using registry_manager_t = RegistryManager;
-
-		// Assert test class to help verbosing test logic into lambda's impl
-		// Heavily inspired by the eponym MSVC's builtin assert class
-		class Assert {
-		public:
-
-			// Verify that two objects are equal.
-			template<class T>
-			static void AreEqual(const T& expected, const T& actual,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(expected == actual, message, lineInfo);
-			}
-
-			// double equality comparison:
-			static void AreEqual(double expected, double actual, double tolerance,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				double diff = expected - actual;
-				FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
-			}
-
-			// float equality comparison:
-			static void AreEqual(float expected, float actual, float tolerance,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				float diff = expected - actual;
-				FailOnCondition(fabs(diff) <= fabs(tolerance), message, lineInfo);
-			}
-
-			// char* string equality comparison:
-			static void AreEqual(const char* expected, const char* actual, bool ignoreCase = false,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				AreEqual(std::string{ expected }, std::string{ actual }, ignoreCase, message, lineInfo);
-			}
-
-			// char* string equality comparison:
-			static void AreEqual(std::string expected, std::string actual, bool ignoreCase = false,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				if (ignoreCase) {
-					std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
-					std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
-				}
-				FailOnCondition(expected == actual, message, lineInfo);
-			}
-
-			// Verify that two references refer to the same object instance (identity):
-			template<class T>
-			static void AreSame(const T& expected, const T& actual,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(&expected == &actual, message, lineInfo);
-			}
-
-			// Generic AreNotEqual comparison:
-			template<class T>
-			static void AreNotEqual(const T& notExpected, const T& actual,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(!(notExpected == actual), message, lineInfo);
-			}
-
-			// double AreNotEqual comparison:
-			static void AreNotEqual(double notExpected, double actual, double tolerance,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				double diff = notExpected - actual;
-				FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
-			}
-
-			// float AreNotEqual comparison:
-			static void AreNotEqual(float notExpected, float actual, float tolerance,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				float diff = notExpected - actual;
-				FailOnCondition(fabs(diff) > fabs(tolerance), message, lineInfo);
-			}
-
-			// char* string AreNotEqual comparison:
-			static void AreNotEqual(const char* notExpected, const char* actual, bool ignoreCase = false,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				AreNotEqual(std::string{ notExpected }, std::string{ actual }, ignoreCase, message, lineInfo);
-			}
-
-			// wchar_t* string AreNotEqual comparison with char* message:
-			static void AreNotEqual(std::string notExpected, std::string actual, bool ignoreCase = false,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				if (ignoreCase) {
-					std::transform(notExpected.begin(), notExpected.end(), notExpected.begin(), ::tolower);
-					std::transform(actual.begin(), actual.end(), actual.begin(), ::tolower);
-				}
-				FailOnCondition(notExpected != actual, message, lineInfo);
-			}
-
-			// Verify that two references do not refer to the same object instance (identity):
-			template<class T>
-			static void AreNotSame(const T& notExpected, const T& actual,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(!(&notExpected == &actual), message, lineInfo);
-			}
-
-			// Verify that a pointer is NULL:
-			template<class T>
-			static void IsNull(const T* actual,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(actual == nullptr, message, lineInfo);
-			}
-
-			// Verify that a pointer is not NULL:
-			template<class T>
-			static void IsNotNull(const T* actual,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(actual != nullptr, message, lineInfo);
-			}
-
-			// Verify that a condition is true:
-			static void IsTrue(bool condition,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(condition, message, lineInfo);
-			}
-
-			// Verify that a conditon is false:
-			static void IsFalse(bool condition,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(!condition, message, lineInfo);
-			}
-
-			// Force the test case result to be Failed:
-			static void Fail(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				FailOnCondition(false, message, lineInfo);
-			}
-
-			// Verify that a function raises an exception:
-			template<class ExpectedException, class Functor>
-			static void ExpectException(Functor functor,
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				try {
-					functor();
-				}
-				catch (ExpectedException) {
-					return;
-				}
-				catch (...) {
-					Fail(message, lineInfo);
-				}
-			}
-
-			template<class ExpectedException, class ReturnType>
-			static void ExpectException(ReturnType(*func)(),
-				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
-				IsNotNull(func, message, lineInfo);
-
-				try {
-					func();
-				}
-				catch (ExpectedException) {
-					return;
-				}
-				catch (...) {
-					Fail(message, lineInfo);
-				}
-			}
-		};
 	}
-
-	using detail::Assert; // Temporary
 
 	/*
 	*
@@ -547,6 +575,12 @@ namespace H2OFastTests {
 	using registry_storage_t = detail::registry_storage_t;
 	using registry_manager_t = detail::RegistryManager;
 	using registry_observer_t = detail::IRegistryObserver;
+
+	//Public exposition
+	namespace Asserter {
+		using detail::AsserterExpression;
+		using detail::AssertThat;
+	}
 
 	// Interface to Implement to access access a registry information
 	// Possibility to export services into a DLL for forther customization
@@ -610,94 +644,6 @@ namespace H2OFastTests {
 				<< "Status: " << infos.test.getStatus() << std::endl;
 		}
 	};
-
-	// Asserter engine wrapper above MSVC's builtin
-	template<class Expr>
-	class Expression {
-	public:
-
-		using empry_expression_t = Expression<nullptr_t>;
-
-		Expression()
-			: expr_(nullptr) {}
-		Expression(Expr&& expr)
-			: expr_(std::forward<Expr>(expr))
-		{}
-
-		template<class NewExpr>
-		Expression<NewExpr> andThat(NewExpr&& expr) {
-			return{ std::forward<NewExpr>(expr) };
-		}
-
-		template<class ... Args>
-		empry_expression_t isTrue(Args&& ... args) {
-			Assert::IsTrue(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t isFalse(Args&& ... args) {
-			Assert::IsFalse(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t isEqualTo(Args&& ... args) {
-			Assert::AreEqual(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t isNotEqualTo(Args&& ... args) {
-			Assert::AreNotEqual(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t isSameAs(Args&& ... args) {
-			Assert::AreSame(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t isNotSameAs(Args&& ... args) {
-			Assert::AreNotSame(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t isNull(Args&& ... args) {
-			Assert::IsNull(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t isNotNull(Args&& ... args) {
-			Assert::IsNotNull(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t fail(Args&& ... args) {
-			Assert::Fail(std::forward<Args>(args)...);
-			return{};
-		}
-
-		template<class ... Args>
-		empry_expression_t ExpectException(Args&& ... args) {
-			Assert::ExpectException(expr_, std::forward<Args>(args)...);
-			return{};
-		}
-
-	private:
-		Expr expr_;
-	};
-
-	// Functor to build an Asserter with template deduction
-	template<class Expr>
-	Expression<Expr> AssertThat(Expr&& expr) {
-		return{ std::forward<Expr>(expr) };
-	}
 
 }
 
