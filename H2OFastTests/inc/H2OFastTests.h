@@ -576,7 +576,7 @@ namespace H2OFastTests {
 	using registry_manager_t = detail::RegistryManager;
 	using registry_observer_t = detail::IRegistryObserver;
 
-	//Public exposition
+	// Asserter exposition
 	namespace Asserter {
 		using detail::AsserterExpression;
 		using detail::AssertThat;
