@@ -41,6 +41,8 @@ namespace H2OFastTests {
 			LineInfo(const char* file, const char* func, int line)
 				: file_(file), func_(func), line_(line)
 			{}
+
+			LineInfo& operator=(const LineInfo&) = delete;
 		};
 
 		using line_info_t = LineInfo;
@@ -58,6 +60,7 @@ namespace H2OFastTests {
 			TestFailure(const std::string& message)
 				: message_(message) {}
 			virtual const char * what() const { return message_.c_str(); }
+			TestFailure& operator=(const TestFailure&) = delete;
 		private:
 			const std::string message_;
 		};
@@ -95,6 +98,11 @@ namespace H2OFastTests {
 			AsserterExpression(Expr&& expr) // Expr must be copyable or movable
 				: expr_(std::forward<Expr>(expr))
 			{}
+
+			AsserterExpression& operator=(const AsserterExpression& rhs) {
+				static_assert(std::is_same<Expr, decltype(rhs.expr_)>::value, "Cannot assign between different types.");
+				expr_ = rhs.expr_;
+			}
 
 			template<class NewExpr>
 			AsserterExpression<NewExpr> andThat(NewExpr&& expr) {
@@ -431,6 +439,8 @@ namespace H2OFastTests {
 		struct TestInfos {
 			const test_t& test;
 			using status_t = test_t::Status;
+			TestInfos(const test_t& t) : test(t) {}
+			TestInfos& operator=(const TestInfos&) = delete;
 		};
 
 		using tests_infos_t = TestInfos;
@@ -598,7 +608,7 @@ namespace H2OFastTests {
 		virtual ~IRegistryTraversal() {}
 	protected:
 		const registry_manager_t& getRegistryManager() const { return registry_; }
-	protected:
+	private:
 		registry_manager_t registry_;
 	};
 
@@ -608,33 +618,33 @@ namespace H2OFastTests {
 		RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
 		std::ostream& print(std::ostream& os, bool verbose) const {
 			auto& registry_manager = getRegistryManager();
-			os << "UNIT TEST SUMMARY [" << registry_.getLabel() << "] [" << registry_.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
+			os << "UNIT TEST SUMMARY [" << registry_manager.getLabel() << "] [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
 
-			os << "\tPASSED:" << registry_.getPassedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tPASSED:" << registry_manager.getPassedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getPassedTests()) {
+				for (const auto test : registry_manager.getPassedTests()) {
 					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl;
 				}
 			}
 
-			os << "\tFAILED:" << registry_.getFailedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tFAILED:" << registry_manager.getFailedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getFailedTests()) {
+				for (const auto test : registry_manager.getFailedTests()) {
 					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
 						<< "\t\tMessage: " << test->getFailureReason() << std::endl;
 				}
 			}
 
-			os << "\tSKIPPED:" << registry_.getSkippedCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tSKIPPED:" << registry_manager.getSkippedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getSkippedTests()) {
+				for (const auto test : registry_manager.getSkippedTests()) {
 					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl;
 				}
 			}
 
-			os << "\tERRORS:" << registry_.getWithErrorCount() << "/" << registry_.getAllTestsCount() << std::endl;
+			os << "\tERRORS:" << registry_manager.getWithErrorCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
 			if (verbose) {
-				for (const auto test : registry_.getWithErrorTests()) {
+				for (const auto test : registry_manager.getWithErrorTests()) {
 					os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
 						<< "\t\tMessage: " << test->getError() << std::endl;
 				}
