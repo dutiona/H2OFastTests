@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-#include "config/H2OFastTests_config.h"
+#include "H2OFastTests_config.h"
 
 namespace H2OFastTests {
 

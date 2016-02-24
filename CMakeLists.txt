@@ -17,8 +17,8 @@ set (H2OFastTests_VERSION_MAJOR 1)
 set (H2OFastTests_VERSION_MINOR 0)
  
 configure_file (
-  ${PROJECT_SOURCE_DIR}/config/H2OFastTests_config.h.in
-  ${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h
+  "${PROJECT_SOURCE_DIR}/config/H2OFastTests_config.h.in"
+  "${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h"
   )
 
 # Activer dossiers dans Visual
@@ -36,29 +36,33 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX")
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
-include_directories("${PROJECT_BINARY_DIR}")
-
 file(
 	GLOB_RECURSE
 	source_files
+	${PROJECT_BINARY_DIR}/config/*
 	inc/*
-)
-
-include_directories(
-	inc/
 )
 
 source_group(
 	"Headers"
 	FILES
 	inc/H2OFastTests.h
+	${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h
 )
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
+include_directories(${PROJECT_BINARY_DIR}/config)
 
 add_library(H2OFastTests STATIC ${source_files})
 set_target_properties(H2OFastTests PROPERTIES LINKER_LANGUAGE CXX)
 
 add_subdirectory(tests)
+
+# add the install targets
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests.h
+         DESTINATION include)
+install (FILES ${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h
+         DESTINATION include)
  
  set(CONFIGURED_ONCE TRUE CACHE INTERNAL
     "A flag showing that CMake has configured at least once.")
