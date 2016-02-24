@@ -164,9 +164,8 @@ namespace H2OFastTests {
 				catch (ExpectedException) {
 					return{};
 				}
-				catch (...) {
-					return fail(message, lineInfo);
-				}
+				catch (...) {}
+
 				return fail(message, lineInfo);
 			}
 
@@ -291,10 +290,10 @@ namespace H2OFastTests {
 				PASSED,	// test successfuly passed
 				FAILED,	// test failed to pass (an assert failed)
 				ERROR,	// an error occured during the test :
-						// any exception was catched like bad_alloc
+				// any exception was catched like bad_alloc
 				SKIPPED,// test was skipped and not run
 				NONE	// the run_scenario function wasn't run yet
-						// for the scenario holding the test
+				// for the scenario holding the test
 			};
 
 			// All available constructors

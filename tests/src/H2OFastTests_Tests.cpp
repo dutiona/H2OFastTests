@@ -28,6 +28,9 @@ bool operator==(const CustomClass& lhs, const CustomClass& rhs) {
 class CustomException : public std::exception
 {};
 
+void throwCustomException(){
+	throw CustomException{};
+}
 
 register_scenario(H2OFastTests_Tests, "Tests case scenario for H2OFastTests lib",
 
@@ -119,6 +122,8 @@ register_scenario(H2OFastTests_Tests, "Tests case scenario for H2OFastTests lib"
 		AssertThat([](){
 			throw CustomException{};
 		}).expectException<CustomException>("Expect catch(CustomException)", line_info());
+
+		AssertThat(throwCustomException).expectException<CustomException>("Expect catch(CustomException)", line_info());
 	})
 );
 
