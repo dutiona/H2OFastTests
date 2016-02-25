@@ -17,6 +17,7 @@ bld/
 [Bb]in/
 [Oo]bj/
 VS2013_*/
+VS2015_*/
 
 
 # Roslyn cache directories
