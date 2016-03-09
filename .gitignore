@@ -18,8 +18,8 @@ bld/
 [Oo]bj/
 VS2013_*/
 VS2015_*/
-
-
+Xcode/
+.DS_Store
 # Roslyn cache directories
 *.ide/
 

@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -31,6 +32,16 @@ namespace H2OFastTests {
 
 	// Implementation details
 	namespace detail {
+
+//XCode workaround
+#if __APPLE__
+        template<typename T, typename ... Args>
+        std::unique_ptr<T> make_unique(Args&& ...args) {
+            return std::unique_ptr<T>{ new T{ std::forward<Args>(args)... } };
+        }
+#else
+        using std::make_unique;
+#endif
 
 		// Line info struct
 		// Holds line number, file name and function name if relevant
@@ -59,7 +70,7 @@ namespace H2OFastTests {
 		public:
 			TestFailure(const std::string& message)
 				: message_(message) {}
-			virtual const char * what() const { return message_.c_str(); }
+			virtual const char * what() const throw() { return message_.c_str(); }
 			TestFailure& operator=(const TestFailure&) = delete;
 		private:
 			const std::string message_;
@@ -86,10 +97,10 @@ namespace H2OFastTests {
 		class AsserterExpression {
 		public:
 
-			using empty_expression_t = AsserterExpression<nullptr_t>;
+			using empty_expression_t = AsserterExpression<std::nullptr_t>;
 
-			template<class Expr>
-			friend AsserterExpression<Expr> AssertThat(Expr&& expr);
+			template<class E>
+			friend AsserterExpression<E> AssertThat(E&& expr);
 
 			AsserterExpression()
 				: expr_(nullptr)
@@ -181,7 +192,7 @@ namespace H2OFastTests {
 			empty_expression_t isEqualTo(double expected, double tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				double diff = expected - expr_;
-				FailureTest(fabs(diff) <= fabs(tolerance), message, lineInfo);
+                FailureTest(std::abs(diff) <= std::abs(tolerance), message, lineInfo);
 				return{};
 			}
 
@@ -189,7 +200,7 @@ namespace H2OFastTests {
 			empty_expression_t isEqualTo(float expected, float tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				float diff = expected - expr_;
-				FailureTest(fabs(diff) <= fabs(tolerance), message, lineInfo);
+                FailureTest(std::abs(diff) <= std::abs(tolerance), message, lineInfo);
 				return{};
 			}
 
@@ -229,7 +240,7 @@ namespace H2OFastTests {
 			empty_expression_t isNotEqualTo(double notExpected, double tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				double diff = notExpected - expr_;
-				FailureTest(fabs(diff) > fabs(tolerance), message, lineInfo);
+                FailureTest(std::abs(diff) > std::abs(tolerance), message, lineInfo);
 				return{};
 			}
 
@@ -237,7 +248,7 @@ namespace H2OFastTests {
 			empty_expression_t isNotEqualTo(float notExpected, float expr_, float tolerance,
 				const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
 				float diff = notExpected - expr_;
-				FailureTest(fabs(diff) > fabs(tolerance), message, lineInfo);
+                FailureTest(std::abs(diff) > std::abs(tolerance), message, lineInfo);
 				return{};
 			}
 
@@ -304,7 +315,7 @@ namespace H2OFastTests {
 			Test(const std::string& label)
 				: Test(label, []() {}) {}
 			Test(const std::string& label, const test_func_t&& test)
-				: label_(label), status_(NONE), test_holder_(std::make_unique<test_func_t>(std::move(test)))
+				: test_holder_(make_unique<test_func_t>(std::move(test))), label_(label), status_(NONE)
 			{}
 
 			// Copy forbidden
@@ -313,9 +324,10 @@ namespace H2OFastTests {
 
 			// Default move impl (for VC2013)
 			Test(Test&& test)
-				: test_holder_(std::move(test.test_holder_)),
-				label_(test.label_), status_(test.status_), exec_time_ms_(test.exec_time_ms_),
-				failure_reason_(test.failure_reason_), skipped_reason_(test.skipped_reason_), error_(test.error_)
+				: exec_time_ms_(test.exec_time_ms_),
+                test_holder_(std::move(test.test_holder_)), label_(test.label_),
+				failure_reason_(test.failure_reason_), skipped_reason_(test.skipped_reason_),
+                error_(test.error_), status_(test.status_)
 			{}
 			Test&& operator=(Test&& test) {
 				test_holder_ = std::move(test.test_holder_);
@@ -516,7 +528,7 @@ namespace H2OFastTests {
 			template<class BadArgument, class ... Args>
 			void push_back(BadArgument&& unknown_typed_arg, Args&& ... tests_or_funcs) {
 				// TODO : decide to eigther crach at compile time
-				static_assert(false, "Unknown type passed to initialize test registry.");
+				//static_assert(false, "Unknown type passed to initialize test registry.");
 				// or print a warning
 				//std::cerr << "Ignoring bad type passed to initialize test registry." << std::endl;
 				// or silently ignore
