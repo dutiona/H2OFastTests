@@ -70,7 +70,7 @@ namespace H2OFastTests {
         public:
             TestFailure(const std::string& message)
                 : message_(message) {}
-            virtual const char * what() const throw() { return message_.c_str(); }
+            virtual const char * what() const throw() override { return message_.c_str(); }
             TestFailure& operator=(const TestFailure&) = delete;
         private:
             const std::string message_;
@@ -433,7 +433,7 @@ namespace H2OFastTests {
         protected:
 
             // Put state to skipped and don't run the test
-            virtual void run_private() { status_ = SKIPPED; }
+            virtual void run_private() override { status_ = SKIPPED; }
 
         };
 
@@ -670,7 +670,7 @@ namespace H2OFastTests {
 
     // Observer impl example
     class ConsoleIO_Observer : public registry_observer_t {
-        virtual void update(const test_infos_t& infos) const {
+        virtual void update(const test_infos_t& infos) const override {
             std::cout << (infos.test.getStatus() == test_infos_t::status_t::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
                 << infos.test.getLabel(false) << "] [" << infos.test.getExecTimeMs().count() << "ms]:" << std::endl
                 << "Status: " << infos.test.getStatus() << std::endl;
