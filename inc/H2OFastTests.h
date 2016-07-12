@@ -496,12 +496,10 @@ namespace H2OFastTests {
         class RegistryManager : public registry_observable_t{
         public:
 
-            // Build a registry and fill it in a static context
-            template<class ... Args>
-            RegistryManager(const std::string& label, Args&& ... tests_or_funcs)
-                : run_(false), label_(label), exec_time_ms_accumulator_(duration_t{ 0 }) {
-                get_registry().emplace(label, test_list_t{});
-                push_back(std::forward<Args>(tests_or_funcs)...);
+            RegistryManager(const std::string& label, std::function<void(RegistryManager)> feeder)
+               : run_(false), label_(label), exec_time_ms_accumulator_(duration_t{ 0 }) {
+               get_registry().emplace(label, test_list_t{});
+               feeder(*this);
             }
 
             //Recursive variadic to iterate over the test pack
@@ -526,7 +524,7 @@ namespace H2OFastTests {
             }
 
             template<class BadArgument, class ... Args>
-            void push_back(BadArgument&& unknown_typed_arg, Args&& ... tests_or_funcs) {
+            void push_back(BadArgument&& /*unknown_typed_arg*/, Args&& ... /*tests_or_funcs*/) {
                 // TODO : decide to eigther crach at compile time
                 //static_assert(false, "Unknown type passed to initialize test registry.");
                 // or print a warning
@@ -680,18 +678,24 @@ namespace H2OFastTests {
 }
 
 //Helper macros to use the unit test suit
-#define register_scenario(name, label, ...) \
-    namespace H2OFastTests { static registry_manager_t registry_manager_ ## name {label, __VA_ARGS__ }; }
+#define register_scenario(name, label, content) \
+   namespace H2OFastTests { \
+      static registry_manager_t registry_manager_ ## name { \
+                                                            label, \
+                                                            [](registry_manager_t& __storage){ \
+                                                               content \
+                                                            } \
+                                                           }; \
+   }
 #define run_scenario(name) \
     H2OFastTests::registry_manager_ ## name.run_tests();
 
 #define describe_test(label, test) \
-    H2OFastTests::detail::make_test(label, (test))
-
+    __storage.push_back(std::move(H2OFastTests::detail::make_test(label, (test))));
 #define skip_test(test) \
-    H2OFastTests::detail::make_skipped_test((test))
+    __storage.push_back(std::move(H2OFastTests::detail::make_skipped_test((test))));
 #define skip_test_reason(reason, test) \
-    H2OFastTests::detail::make_skipped_test(reason, (test))
+    __storage.push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, (test))));
 
 #define add_test_to_scenario(name, made_test) \
     H2OFastTests::registry_manager_ ## name.push_back(made_test);
