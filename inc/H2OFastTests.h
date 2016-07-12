@@ -447,6 +447,13 @@ namespace H2OFastTests {
         test_t make_skipped_test(test_func_t&& func) { return skipped_test_t{ std::move(make_test(std::move(func))) }; }
         test_t make_skipped_test(const std::string& reason, test_func_t&& func) { return skipped_test_t{ reason, std::move(make_test(std::move(func))) }; }
 
+		template<class Name>
+		struct type_helper
+		{
+			const char* name = typeid(Name).name();
+			using type = Name;
+		};
+
         // POD containing informations about a test
         struct TestInfos {
             using status_t = test_status_t;
@@ -484,8 +491,7 @@ namespace H2OFastTests {
         using registry_observable_t = IRegistryObservable;
 
         // Global static registry storage object
-        using test_list_t = std::vector<test_t>;
-        using registry_storage_t = std::map<std::string, test_list_t>;
+        using registry_storage_t = std::vector<test_t>;
 
         registry_storage_t& get_registry() {
             static registry_storage_t registry;
@@ -496,25 +502,18 @@ namespace H2OFastTests {
         class RegistryManager : public registry_observable_t{
         public:
 
-            RegistryManager(const std::string& label, std::function<void(RegistryManager)> feeder)
-               : run_(false), label_(label), exec_time_ms_accumulator_(duration_t{ 0 }) {
-               get_registry().emplace(label, test_list_t{});
-               feeder(*this);
+            RegistryManager(std::function<void(void)> feeder)
+               : run_(false), exec_time_ms_accumulator_(duration_t{ 0 }) {
+               feeder();
             }
 
             //Recursive variadic to iterate over the test pack
             void push_back(test_t&& test) {
-                get_registry()[label_].push_back(std::move(test));
-            }
-
-            template<class ... Args>
-            void push_back(test_t&& test, Args&& ... tests_or_funcs) {
-                push_back(std::move(test));
-                push_back(std::forward<Args>(tests_or_funcs)...);
+                get_registry().push_back(std::move(test));
             }
 
             void push_back(test_func_t&& func) {
-                get_registry()[label_].push_back(std::move(make_test(std::move(func))));
+                get_registry().push_back(std::move(make_test(std::move(func))));
             }
 
             template<class ... Args>
@@ -535,7 +534,7 @@ namespace H2OFastTests {
 
             // Run all the tests
             void run_tests() {
-                auto& tests = get_registry()[label_];
+                auto& tests = get_registry();
                 for (auto& test : tests) {
                     test.run();
                     exec_time_ms_accumulator_ += test.getExecTimeMs();
@@ -560,7 +559,6 @@ namespace H2OFastTests {
             }
 
             // Get informations
-            const std::string& getLabel() const { return label_; }
 
             size_t getPassedCount() const { return run_ ? tests_passed_.size() : 0; }
             const std::vector<const test_t*>& getPassedTests() const { return tests_passed_; }
@@ -574,14 +572,13 @@ namespace H2OFastTests {
             size_t getWithErrorCount() const { return run_ ? tests_with_error_.size() : 0; }
             const std::vector<const test_t*>& getWithErrorTests() const { return tests_with_error_; }
 
-            size_t getAllTestsCount() const { return run_ ? get_registry()[label_].size() : 0; }
-            const test_list_t& getAllTests() const { return get_registry()[label_]; }
+            size_t getAllTestsCount() const { return run_ ? get_registry().size() : 0; }
+            const registry_storage_t& getAllTests() const { return get_registry(); }
             duration_t getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : duration_t{ 0 }; }
 
         private:
 
             bool run_;
-            std::string label_;
             duration_t exec_time_ms_accumulator_;
             std::vector<const test_t*> tests_passed_;
             std::vector<const test_t*> tests_failed_;
@@ -603,8 +600,8 @@ namespace H2OFastTests {
     using line_info_t = detail::line_info_t;
     using test_infos_t = detail::tests_infos_t;
     using registry_storage_t = detail::registry_storage_t;
-    using registry_manager_t = detail::RegistryManager;
     using registry_observer_t = detail::IRegistryObserver;
+    using registry_manager_t = detail::RegistryManager;
 
     // Asserter exposition
     namespace Asserter {
@@ -630,7 +627,7 @@ namespace H2OFastTests {
         RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
         std::ostream& print(std::ostream& os, bool verbose) const {
             auto& registry_manager = getRegistryManager();
-            os << "UNIT TEST SUMMARY [" << registry_manager.getLabel() << "] [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
+            os << "UNIT TEST SUMMARY [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
 
             os << "\tPASSED:" << registry_manager.getPassedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
             if (verbose) {
@@ -678,33 +675,32 @@ namespace H2OFastTests {
 }
 
 //Helper macros to use the unit test suit
-#define register_scenario(name, label, content) \
-   namespace H2OFastTests { \
-      static registry_manager_t registry_manager_ ## name { \
-                                                            label, \
-                                                            [](registry_manager_t& __storage){ \
-                                                               content \
-                                                            } \
-                                                           }; \
-   }
-#define run_scenario(name) \
-    H2OFastTests::registry_manager_ ## name.run_tests();
+#define register_tests \
+	static H2OFastTests::registry_manager_t registry_manager
 
-#define describe_test(label, test) \
-    __storage.push_back(std::move(H2OFastTests::detail::make_test(label, (test))));
-#define skip_test(test) \
-    __storage.push_back(std::move(H2OFastTests::detail::make_skipped_test((test))));
-#define skip_test_reason(reason, test) \
-    __storage.push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, (test))));
+#define run_tests() \
+    registry_manager.run_tests();
 
-#define add_test_to_scenario(name, made_test) \
-    H2OFastTests::registry_manager_ ## name.push_back(made_test);
+void describe_test(const std::string& test_name, H2OFastTests::detail::test_func_t&& test) {
+	H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_test(test_name, std::move(test))));
+}
 
-#define register_observer(name, class_name, instance_ptr) \
-    H2OFastTests::registry_manager_ ## name.addObserver(std::shared_ptr<class_name>(instance_ptr));
+void skip_test(H2OFastTests::detail::test_func_t&& test) {
+	H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(std::move(test))));
+}
 
-#define print_result(name, verbose) \
-    H2OFastTests::RegistryTraversal_ConsoleIO(H2OFastTests::registry_manager_ ## name).print(std::cout, (verbose))
+void skip_test_reason(const std::string& reason, H2OFastTests::detail::test_func_t&& test) {
+	H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, std::move(test))));
+}
+
+#define add_test_to_scenario(made_test) \
+    registry_manager.push_back(made_test)
+
+#define register_observer(class_name, instance_ptr) \
+    registry_manager.addObserver(std::shared_ptr<class_name>(instance_ptr))
+
+#define print_result(verbose) \
+    H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager).print(std::cout, (verbose))
 
 #define line_info() \
     &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
