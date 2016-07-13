@@ -37,94 +37,94 @@ register_scenario(H2OFastTests_Tests)
     auto epsf_v = 1e-5f;
     auto epsd_v = 1e-5;
 
-    describe_test("Assert::AreEqual(double, tolerance = 1e-5)", [epsd_v]() {
+    skip_test("Assert::AreEqual(double, tolerance = 1e-5)", [epsd_v]() {
         AssertThat(0.).isEqualTo(epsd_v, epsd_v, "Expect 0. == 1e-5");
     });
 
-    describe_test("Assert::AreNotEqual(double, tolerance = 1e-5)", [epsd_v]() {
+    add_test("Assert::AreNotEqual(double, tolerance = 1e-5)", [epsd_v]() {
         AssertThat(0.).isNotEqualTo(epsd_v * 10, epsd_v, "Expect 0. != 10e-5");
     });
 
-    describe_test("Assert::AreEqual(float, tolerance = 1e-5)", [epsf_v]() {
+    add_test("Assert::AreEqual(float, tolerance = 1e-5)", [epsf_v]() {
         AssertThat(0.f).isEqualTo(epsf_v, epsf_v, "Expect 0.f == 1e-5f");
     });
 
-    describe_test("Assert::AreNotEqual(float, tolerance = 1e-5)", [epsf_v]() {
+    add_test("Assert::AreNotEqual(float, tolerance = 1e-5)", [epsf_v]() {
         AssertThat(0.f).isNotEqualTo(epsf_v * 10, epsf_v, "Expect 0.f != 10e-5f");
     });
 
-    describe_test("Assert::AreEqual(char*, ignoreCase = false)", []() {
+    add_test("Assert::AreEqual(char*, ignoreCase = false)", []() {
         AssertThat("aaa").isEqualTo("aaa", false, "Expect aaa == aaa");
     });
 
-    describe_test("Assert::AreNotEqual(char*, ignoreCase = false)", []() {
+    add_test("Assert::AreNotEqual(char*, ignoreCase = false)", []() {
         AssertThat("aaa").isNotEqualTo("aAa", false, "Expect aaa != aAa");
     });
 
-    describe_test("Assert::AreEqual(char*, ignoreCase = true)", []() {
+    add_test("Assert::AreEqual(char*, ignoreCase = true)", []() {
         AssertThat("aaa").isEqualTo("aAa", true, "Expect aaa == aAa");
     });
 
-    describe_test("Assert::AreNotEqual(char*, ignoreCase = true)", []() {
+    add_test("Assert::AreNotEqual(char*, ignoreCase = true)", []() {
         AssertThat("aaa").isNotEqualTo("aAb", true, "Expect aaa != aAb");
     });
 
-    describe_test("Assert::AreEqual(std::string, ignoreCase = false)", []() {
+    add_test("Assert::AreEqual(std::string, ignoreCase = false)", []() {
         AssertThat(std::string{ "aaa" }).isEqualTo(std::string{ "aaa" }, false, "Expect aaa == aaa");
     });
 
-    describe_test("Assert::AreNotEqual(std::string, ignoreCase = false)", []() {
+    add_test("Assert::AreNotEqual(std::string, ignoreCase = false)", []() {
         AssertThat(std::string{ "aaa" }).isNotEqualTo(std::string{ "aAa" }, false, "Expect aaa != aAa");
     });
 
-    describe_test("Assert::AreEqual(std::string, ignoreCase = true)", []() {
+    add_test("Assert::AreEqual(std::string, ignoreCase = true)", []() {
         AssertThat(std::string{ "aaa" }).isEqualTo(std::string{ "aAa" }, true, "Expect aaa == aAa");
     });
 
-    describe_test("Assert::AreNotEqual(std::string, ignoreCase = true)", []() {
+    add_test("Assert::AreNotEqual(std::string, ignoreCase = true)", []() {
         AssertThat(std::string{ "aaa" }).isNotEqualTo(std::string{ "aAb" }, true, "Expect aaa != aAb");
     });
 
-    describe_test("Assert::AreEqual(CustomClass)", []() {
+    add_test("Assert::AreEqual(CustomClass)", []() {
         AssertThat(CustomClass{ true }).isEqualTo(CustomClass{ true }, "Expect CustomClass{ true } == CustomClass{ true }");
     });
 
-    describe_test("Assert::AreNotEqual(CustomClass)", []() {
+    add_test("Assert::AreNotEqual(CustomClass)", []() {
         AssertThat(CustomClass{ true }).isNotEqualTo(CustomClass{ false }, "Expect CustomClass{ true } != CustomClass{ false}");
     });
 
     int a = 0;
     a++;
 
-    describe_test("Assert::AreSame(void*)", []() {
+    add_test("Assert::AreSame(void*)", []() {
         void* a;
         AssertThat(a).isSameAs(a, "Expect &a == &a");
     });
 
-    describe_test("Assert::AreNotSame(void*)", []() {
+    add_test("Assert::AreNotSame(void*)", []() {
         void* a; void* b;
         AssertThat(a).isNotSameAs(b, "Expect &a == &a");
     });
 
-    describe_test("Assert::IsNull(nullptr)", []() {
+    add_test("Assert::IsNull(nullptr)", []() {
         void* a = nullptr;
         AssertThat(a).isNull("Expect nullptr == nullptr");
     });
 
-    describe_test("Assert::IsNotNull(int)", []() {
+    add_test("Assert::IsNotNull(int)", []() {
         int a = 0;
         AssertThat(&a).isNotNull("Expect int != nullptr");
     });
 
-    describe_test("Assert::IsTrue(true)", []() {
+    add_test("Assert::IsTrue(true)", []() {
         AssertThat(true).isTrue("Expect true == true");
     });
 
-    describe_test("Assert::IsFalse(false)", []() {
+    add_test("Assert::IsFalse(false)", []() {
         AssertThat(false).isFalse("Expect true != false");
     });
 
-    describe_test("Assert::ExceptException<CustomException>", []() {
+    add_test("Assert::ExceptException<CustomException>", []() {
         AssertThat([]() {
             throw CustomException{};
         }).expectException<CustomException>("Expect catch(CustomException)");

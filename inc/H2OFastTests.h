@@ -443,10 +443,10 @@ namespace H2OFastTests {
         using skipped_test_t = detail::SkippedTest;
 
         // Helper functions to build/skip a test case
-        test_t make_test(test_func_t&& func) { return test_t{ std::move(func) }; }
-        test_t make_test(const std::string& label, test_func_t&& func) { return test_t{ label, std::move(func) }; }
-        test_t make_skipped_test(test_func_t&& test) { return skipped_test_t{ std::move(test) }; }
-        test_t make_skipped_test(const std::string& reason, test_func_t&& test) { return skipped_test_t{ reason, std::move(test) }; }
+        std::unique_ptr<test_t> make_test(test_func_t&& func) { return make_unique<test_t>(std::move(func)); }
+        std::unique_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return make_unique<test_t>(label, std::move(func)); }
+		std::unique_ptr<test_t> make_skipped_test(test_func_t&& test) { return make_unique<skipped_test_t>(std::move(test)); }
+		std::unique_ptr<test_t> make_skipped_test(const std::string& reason, test_func_t&& test) { return make_unique<skipped_test_t>(reason, std::move(test)); }
 
         // POD containing informations about a test
         struct TestInfos {
@@ -499,7 +499,7 @@ namespace H2OFastTests {
         using registry_observable_t = IRegistryObservable;
 
         // Global static registry storage object
-        using test_list_t = std::vector<test_t>;
+        using test_list_t = std::vector<std::unique_ptr<test_t>>;
         using registry_storage_t = std::map<std::type_index, test_list_t>;
 
         registry_storage_t& get_registry() {
@@ -518,22 +518,22 @@ namespace H2OFastTests {
             }
 
             //Recursive variadic to iterate over the test pack
-            void push_back(test_t&& test) {
+            void add_test(test_t&& test) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(test));
             }
 
-            void push_back(test_func_t&& func) {
+            void add_test(test_func_t&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(std::move(func))));
             }
 
-            void push_back(const std::string& label, test_func_t&& func) {
+            void add_test(const std::string& label, test_func_t&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(label, std::move(func))));
             }
-            void skip_push_back(test_func_t&& func) {
+            void skip_test(test_func_t&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(std::move(func))));
             }
 
-            void skip_push_back(const std::string& reason, test_func_t&& func) {
+            void skip_test(const std::string& reason, test_func_t&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(reason, std::move(func))));
             }
 
@@ -541,21 +541,21 @@ namespace H2OFastTests {
             void run_tests() {
                 auto& tests = get_registry()[type_helper<ScenarioName>::type_index()];
                 for (auto& test : tests) {
-                    test.run();
-                    exec_time_ms_accumulator_ += test.getExecTimeMs();
-                    notify(tests_infos_t{ test });
-                    switch (test.getStatus()) {
+                    test->run();
+                    exec_time_ms_accumulator_ += test->getExecTimeMs();
+                    notify(tests_infos_t{ *test });
+                    switch (test->getStatus()) {
                     case test_status_t::PASSED:
-                        tests_passed_.push_back(&test);
+                        tests_passed_.push_back(test.get());
                         break;
                     case test_status_t::FAILED:
-                        tests_failed_.push_back(&test);
+                        tests_failed_.push_back(test.get());
                         break;
                     case test_status_t::SKIPPED:
-                        tests_skipped_.push_back(&test);
+                        tests_skipped_.push_back(test.get());
                         break;
                     case test_status_t::ERROR:
-                        tests_with_error_.push_back(&test);
+                        tests_with_error_.push_back(test.get());
                         break;
                     default: break;
                     }
@@ -696,9 +696,6 @@ namespace H2OFastTests {
 
 #define run_scenario(ScenarioName) \
     ScenarioName ## _registry_manager.run_tests();
-
-#define describe_test push_back
-#define skip_test skip_push_back
 
 #define register_observer(ScenarioName, class_name, instance_ptr) \
     ScenarioName ## _registry_manager.addObserver(std::shared_ptr<class_name>(instance_ptr))
