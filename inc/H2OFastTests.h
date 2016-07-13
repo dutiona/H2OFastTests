@@ -637,7 +637,8 @@ namespace H2OFastTests {
         RegistryTraversal_ConsoleIO(const registry_manager_t<ScenarioName>& registry) : IRegistryTraversal<ScenarioName>(registry) {}
         std::ostream& print(std::ostream& os, bool verbose) const {
             auto& registry_manager = getRegistryManager();
-            os << "UNIT TEST SUMMARY [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
+			const auto test_name = std::string{ H2OFastTests::detail::type_helper<ScenarioName>::name() };
+			os << "UNIT TEST SUMMARY [" << test_name.substr(test_name.find(' ') + 1) << "] [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
 
             os << "\tPASSED:" << registry_manager.getPassedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
             if (verbose) {
