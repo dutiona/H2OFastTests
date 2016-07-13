@@ -33,7 +33,7 @@ namespace H2OFastTests {
     // Implementation details
     namespace detail {
 
-//XCode workaround
+        //XCode workaround
 #if __APPLE__
         template<typename T, typename ... Args>
         std::unique_ptr<T> make_unique(Args&& ...args) {
@@ -447,12 +447,12 @@ namespace H2OFastTests {
         test_t make_skipped_test(test_func_t&& func) { return skipped_test_t{ std::move(make_test(std::move(func))) }; }
         test_t make_skipped_test(const std::string& reason, test_func_t&& func) { return skipped_test_t{ reason, std::move(make_test(std::move(func))) }; }
 
-		template<class Name>
-		struct type_helper
-		{
-			const char* name = typeid(Name).name();
-			using type = Name;
-		};
+        template<class Name>
+        struct type_helper
+        {
+            const char* name = typeid(Name).name();
+            using type = Name;
+        };
 
         // POD containing informations about a test
         struct TestInfos {
@@ -503,8 +503,8 @@ namespace H2OFastTests {
         public:
 
             RegistryManager(std::function<void(void)> feeder)
-               : run_(false), exec_time_ms_accumulator_(duration_t{ 0 }) {
-               feeder();
+                : run_(false), exec_time_ms_accumulator_(duration_t{ 0 }) {
+                feeder();
             }
 
             //Recursive variadic to iterate over the test pack
@@ -676,21 +676,36 @@ namespace H2OFastTests {
 
 //Helper macros to use the unit test suit
 #define register_tests \
-	static H2OFastTests::registry_manager_t registry_manager
+    static H2OFastTests::registry_manager_t registry_manager
 
 #define run_tests() \
     registry_manager.run_tests();
 
-void describe_test(const std::string& test_name, H2OFastTests::detail::test_func_t&& test) {
-	H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_test(test_name, std::move(test))));
+void describe_test(const std::string& label, H2OFastTests::detail::test_func_t&& test) {
+    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_test(label, std::move(test))));
+}
+
+void describe_test(H2OFastTests::detail::test_func_t&& test) {
+    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_test(std::move(test))));
+}
+
+void describe_test(H2OFastTests::detail::test_t&& test) {
+    H2OFastTests::detail::get_registry().push_back(std::move(test));
 }
 
 void skip_test(H2OFastTests::detail::test_func_t&& test) {
-	H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(std::move(test))));
+    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(std::move(test))));
+}
+void skip_test(H2OFastTests::detail::test_t&& test) {
+    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(std::move(test))));
 }
 
 void skip_test_reason(const std::string& reason, H2OFastTests::detail::test_func_t&& test) {
-	H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, std::move(test))));
+    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, std::move(test))));
+}
+
+void skip_test_reason(const std::string& reason, H2OFastTests::detail::test_t&& test) {
+    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, std::move(test))));
 }
 
 #define add_test_to_scenario(made_test) \
