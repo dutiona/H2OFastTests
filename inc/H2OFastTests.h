@@ -25,6 +25,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <typeinfo>
+#include <typeindex>
 
 #include "H2OFastTests_config.h"
 
@@ -391,6 +393,7 @@ namespace H2OFastTests {
             std::string error_;
             Status status_;
 
+            template<class ScenarioName>
             friend class RegistryManager;
         };
 
@@ -423,9 +426,9 @@ namespace H2OFastTests {
         class SkippedTest : public Test {
         public:
 
-            SkippedTest(Test&& test)
+            SkippedTest(test_func_t&& test)
                 : Test{ std::move(test) } {}
-            SkippedTest(const std::string& reason, Test&& test)
+            SkippedTest(const std::string& reason, test_func_t&& test)
                 : Test{ std::move(test) } {
                 skipped_reason_ = reason;
             }
@@ -442,17 +445,8 @@ namespace H2OFastTests {
         // Helper functions to build/skip a test case
         test_t make_test(test_func_t&& func) { return test_t{ std::move(func) }; }
         test_t make_test(const std::string& label, test_func_t&& func) { return test_t{ label, std::move(func) }; }
-        test_t make_skipped_test(test_t&& test) { return skipped_test_t{ std::move(test) }; }
-        test_t make_skipped_test(const std::string& reason, test_t&& test) { return skipped_test_t{ reason, std::move(test) }; }
-        test_t make_skipped_test(test_func_t&& func) { return skipped_test_t{ std::move(make_test(std::move(func))) }; }
-        test_t make_skipped_test(const std::string& reason, test_func_t&& func) { return skipped_test_t{ reason, std::move(make_test(std::move(func))) }; }
-
-        template<class Name>
-        struct type_helper
-        {
-            const char* name = typeid(Name).name();
-            using type = Name;
-        };
+        test_t make_skipped_test(test_func_t&& test) { return skipped_test_t{ std::move(test) }; }
+        test_t make_skipped_test(const std::string& reason, test_func_t&& test) { return skipped_test_t{ reason, std::move(test) }; }
 
         // POD containing informations about a test
         struct TestInfos {
@@ -465,6 +459,20 @@ namespace H2OFastTests {
         };
 
         using tests_infos_t = TestInfos;
+
+        template<class Type>
+        struct type_helper {
+            static bool before(const std::type_info& rhs) { return typeid(Type).before(rhs); }
+            static const char* raw_name() { return typeid(Type).raw_name(); }
+            static const char* name() { return typeid(Type).name(); }
+            static size_t hash_code() { return typeid(C).hash_code(); }
+            static std::type_index type_index() { return std::type_index(typeid(Type)); }
+            using type = Type;
+            template<class LhsType, class RhsType>
+            friend bool operator==(const type_helper<LhsType>& lhs, const type_helper<RhsType>& rhs) { return typeid(LhsType) == typeid(RhsType); }
+            template<class LhsType, class RhsType>
+            friend bool operator!=(const type_helper<LhsType>& lhs, const type_helper<RhsType>& rhs) { return typeid(LhsType) != typeid(RhsType); }
+        };
 
         // Interface for making an observer
         class IRegistryObserver {
@@ -491,7 +499,8 @@ namespace H2OFastTests {
         using registry_observable_t = IRegistryObservable;
 
         // Global static registry storage object
-        using registry_storage_t = std::vector<test_t>;
+        using test_list_t = std::vector<test_t>;
+        using registry_storage_t = std::map<std::type_index, test_list_t>;
 
         registry_storage_t& get_registry() {
             static registry_storage_t registry;
@@ -499,42 +508,38 @@ namespace H2OFastTests {
         }
 
         // Manage a registry in a static context
+        template<class ScenarioName>
         class RegistryManager : public registry_observable_t{
         public:
 
-            RegistryManager(std::function<void(void)> feeder)
+            RegistryManager(std::function<bool(void)> feeder)
                 : run_(false), exec_time_ms_accumulator_(duration_t{ 0 }) {
                 feeder();
             }
 
             //Recursive variadic to iterate over the test pack
             void push_back(test_t&& test) {
-                get_registry().push_back(std::move(test));
+                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(test));
             }
 
             void push_back(test_func_t&& func) {
-                get_registry().push_back(std::move(make_test(std::move(func))));
+                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(std::move(func))));
             }
 
-            template<class ... Args>
-            void push_back(test_func_t&& func, Args&& ... tests_or_funcs) {
-                push_back(std::move(func));
-                push_back(std::forward<Args>(tests_or_funcs)...);
+            void push_back(const std::string& label, test_func_t&& func) {
+                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(label, std::move(func))));
+            }
+            void skip_push_back(test_func_t&& func) {
+                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(std::move(func))));
             }
 
-            template<class BadArgument, class ... Args>
-            void push_back(BadArgument&& /*unknown_typed_arg*/, Args&& ... /*tests_or_funcs*/) {
-                // TODO : decide to eigther crach at compile time
-                //static_assert(false, "Unknown type passed to initialize test registry.");
-                // or print a warning
-                //std::cerr << "Ignoring bad type passed to initialize test registry." << std::endl;
-                // or silently ignore
-                //push_back(std::forward<Args>(tests_or_funcs)...);
+            void skip_push_back(const std::string& reason, test_func_t&& func) {
+                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(reason, std::move(func))));
             }
 
             // Run all the tests
             void run_tests() {
-                auto& tests = get_registry();
+                auto& tests = get_registry()[type_helper<ScenarioName>::type_index()];
                 for (auto& test : tests) {
                     test.run();
                     exec_time_ms_accumulator_ += test.getExecTimeMs();
@@ -558,6 +563,7 @@ namespace H2OFastTests {
                 run_ = true;
             }
 
+
             // Get informations
 
             size_t getPassedCount() const { return run_ ? tests_passed_.size() : 0; }
@@ -572,8 +578,8 @@ namespace H2OFastTests {
             size_t getWithErrorCount() const { return run_ ? tests_with_error_.size() : 0; }
             const std::vector<const test_t*>& getWithErrorTests() const { return tests_with_error_; }
 
-            size_t getAllTestsCount() const { return run_ ? get_registry().size() : 0; }
-            const registry_storage_t& getAllTests() const { return get_registry(); }
+            size_t getAllTestsCount() const { return run_ ? get_registry()[type_helper<ScenarioName>::type_index()].size() : 0; }
+            const test_list_t& getAllTests() const { return get_registry()[type_helper<ScenarioName>::type_index()]; }
             duration_t getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : duration_t{ 0 }; }
 
         private:
@@ -587,7 +593,8 @@ namespace H2OFastTests {
 
         };
 
-        using registry_manager_t = RegistryManager;
+        template<class ScenarioName>
+        using registry_manager_t = RegistryManager<ScenarioName>;
     }
 
     /*
@@ -601,7 +608,8 @@ namespace H2OFastTests {
     using test_infos_t = detail::tests_infos_t;
     using registry_storage_t = detail::registry_storage_t;
     using registry_observer_t = detail::IRegistryObserver;
-    using registry_manager_t = detail::RegistryManager;
+    template<class ScenarioName>
+    using registry_manager_t = detail::RegistryManager<ScenarioName>;
 
     // Asserter exposition
     namespace Asserter {
@@ -611,20 +619,22 @@ namespace H2OFastTests {
 
     // Interface to Implement to access access a registry information
     // Possibility to export services into a DLL for forther customization
+    template<class ScenarioName>
     class IRegistryTraversal {
     public:
-        IRegistryTraversal(const registry_manager_t& registry) : registry_(registry) {}
+        IRegistryTraversal(const registry_manager_t<ScenarioName>& registry) : registry_(registry) {}
         virtual ~IRegistryTraversal() {}
     protected:
-        const registry_manager_t& getRegistryManager() const { return registry_; }
+        const registry_manager_t<ScenarioName>& getRegistryManager() const { return registry_; }
     private:
-        registry_manager_t registry_;
+        registry_manager_t<ScenarioName> registry_;
     };
 
     // Trivial impl for console display results
-    class RegistryTraversal_ConsoleIO : private IRegistryTraversal {
+    template<class ScenarioName>
+    class RegistryTraversal_ConsoleIO : private IRegistryTraversal<ScenarioName> {
     public:
-        RegistryTraversal_ConsoleIO(const registry_manager_t& registry) : IRegistryTraversal{ registry } {}
+        RegistryTraversal_ConsoleIO(const registry_manager_t<ScenarioName>& registry) : IRegistryTraversal<ScenarioName>(registry) {}
         std::ostream& print(std::ostream& os, bool verbose) const {
             auto& registry_manager = getRegistryManager();
             os << "UNIT TEST SUMMARY [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
@@ -675,47 +685,26 @@ namespace H2OFastTests {
 }
 
 //Helper macros to use the unit test suit
-#define register_tests \
-    static H2OFastTests::registry_manager_t registry_manager
+#define register_scenario(ScenarioName) \
+    struct ScenarioName : H2OFastTests::detail::RegistryManager<ScenarioName> { \
+        ScenarioName(std::function<bool(void)> feeder); \
+    }; \
+    static ScenarioName ScenarioName ## _registry_manager{ []() { \
+        return H2OFastTests::detail::get_registry().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), H2OFastTests::detail::test_list_t{}).second; \
+    } }; \
+    ScenarioName::ScenarioName(std::function<bool(void)> feeder) : RegistryManager<ScenarioName>{ feeder }
 
-#define run_tests() \
-    registry_manager.run_tests();
+#define run_scenario(ScenarioName) \
+    ScenarioName ## _registry_manager.run_tests();
 
-void describe_test(const std::string& label, H2OFastTests::detail::test_func_t&& test) {
-    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_test(label, std::move(test))));
-}
+#define describe_test push_back
+#define skip_test skip_push_back
 
-void describe_test(H2OFastTests::detail::test_func_t&& test) {
-    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_test(std::move(test))));
-}
+#define register_observer(ScenarioName, class_name, instance_ptr) \
+    ScenarioName ## _registry_manager.addObserver(std::shared_ptr<class_name>(instance_ptr))
 
-void describe_test(H2OFastTests::detail::test_t&& test) {
-    H2OFastTests::detail::get_registry().push_back(std::move(test));
-}
-
-void skip_test(H2OFastTests::detail::test_func_t&& test) {
-    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(std::move(test))));
-}
-void skip_test(H2OFastTests::detail::test_t&& test) {
-    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(std::move(test))));
-}
-
-void skip_test_reason(const std::string& reason, H2OFastTests::detail::test_func_t&& test) {
-    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, std::move(test))));
-}
-
-void skip_test_reason(const std::string& reason, H2OFastTests::detail::test_t&& test) {
-    H2OFastTests::detail::get_registry().push_back(std::move(H2OFastTests::detail::make_skipped_test(reason, std::move(test))));
-}
-
-#define add_test_to_scenario(made_test) \
-    registry_manager.push_back(made_test)
-
-#define register_observer(class_name, instance_ptr) \
-    registry_manager.addObserver(std::shared_ptr<class_name>(instance_ptr))
-
-#define print_result(verbose) \
-    H2OFastTests::RegistryTraversal_ConsoleIO(registry_manager).print(std::cout, (verbose))
+#define print_result(ScenarioName, verbose) \
+    H2OFastTests::RegistryTraversal_ConsoleIO<ScenarioName>(ScenarioName ## _registry_manager).print(std::cout, (verbose))
 
 #define line_info() \
     &H2OFastTests::line_info_t(__FILE__, "", __LINE__)

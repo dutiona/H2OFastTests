@@ -32,10 +32,7 @@ void throwCustomException() {
     throw CustomException{};
 }
 
-
-
-
-register_tests([]()
+register_scenario(H2OFastTests_Tests)
 {
     auto epsf_v = 1e-5f;
     auto epsd_v = 1e-5;
@@ -134,17 +131,11 @@ register_tests([]()
 
         AssertThat(throwCustomException).expectException<CustomException>("Expect catch(CustomException)");
     });
-
-});
-
-
-
-
-
+}
 
 int main(int /*argc*/, char** /*argv*/) {
-    run_tests();
-    print_result(true);
+    run_scenario(H2OFastTests_Tests);
+    print_result(H2OFastTests_Tests, true);
 
     std::cout << "Press enter to continue...";
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
