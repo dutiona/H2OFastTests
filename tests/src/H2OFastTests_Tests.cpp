@@ -14,6 +14,7 @@
 #include <limits>
 #include <stdexcept>
 
+
 using namespace H2OFastTests::Asserter;
 
 
@@ -136,6 +137,8 @@ register_scenario(H2OFastTests_Tests)
 int main(int /*argc*/, char** /*argv*/) {
     run_scenario(H2OFastTests_Tests);
     print_result(H2OFastTests_Tests, true);
+
+    ColoredPrintf(GTestColor::COLOR_RED, "YAY %s", "owww");
 
     std::cout << "Press enter to continue...";
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');

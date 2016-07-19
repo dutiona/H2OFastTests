@@ -445,8 +445,8 @@ namespace H2OFastTests {
         // Helper functions to build/skip a test case
         std::unique_ptr<test_t> make_test(test_func_t&& func) { return make_unique<test_t>(std::move(func)); }
         std::unique_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return make_unique<test_t>(label, std::move(func)); }
-		std::unique_ptr<test_t> make_skipped_test(test_func_t&& test) { return make_unique<skipped_test_t>(std::move(test)); }
-		std::unique_ptr<test_t> make_skipped_test(const std::string& reason, test_func_t&& test) { return make_unique<skipped_test_t>(reason, std::move(test)); }
+        std::unique_ptr<test_t> make_skipped_test(test_func_t&& test) { return make_unique<skipped_test_t>(std::move(test)); }
+        std::unique_ptr<test_t> make_skipped_test(const std::string& reason, test_func_t&& test) { return make_unique<skipped_test_t>(reason, std::move(test)); }
 
         // POD containing informations about a test
         struct TestInfos {
@@ -637,8 +637,8 @@ namespace H2OFastTests {
         RegistryTraversal_ConsoleIO(const registry_manager_t<ScenarioName>& registry) : IRegistryTraversal<ScenarioName>(registry) {}
         std::ostream& print(std::ostream& os, bool verbose) const {
             auto& registry_manager = getRegistryManager();
-			const auto test_name = std::string{ H2OFastTests::detail::type_helper<ScenarioName>::name() };
-			os << "UNIT TEST SUMMARY [" << test_name.substr(test_name.find(' ') + 1) << "] [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
+            const auto test_name = std::string{ H2OFastTests::detail::type_helper<ScenarioName>::name() };
+            os << "UNIT TEST SUMMARY [" << test_name.substr(test_name.find(' ') + 1) << "] [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
 
             os << "\tPASSED:" << registry_manager.getPassedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
             if (verbose) {
