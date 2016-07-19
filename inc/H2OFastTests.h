@@ -372,6 +372,10 @@ namespace H2OFastTests {
                     status_ = ERROR;
                     error_ = e.what();
                 }
+                catch (...) {
+                    status_ = ERROR;
+                    error_ = "Unkown error";
+                }
                 exec_time_ms_ = std::chrono::high_resolution_clock::now() - start;
             }
 
@@ -422,14 +426,23 @@ namespace H2OFastTests {
             return os;
         }
 
+        std::string to_string(test_t::Status status) {
+            std::ostringstream os;
+            os << status;
+            return os.str();
+        }
+
         // This class wrap a test and make it so it's skipped (never run)
         class SkippedTest : public Test {
         public:
 
-            SkippedTest(test_func_t&& test)
-                : Test{ std::move(test) } {}
-            SkippedTest(const std::string& reason, test_func_t&& test)
-                : Test{ std::move(test) } {
+            SkippedTest(test_func_t&& func)
+                : Test{ std::move(func) } {}
+            SkippedTest(const std::string& label, test_func_t&& func)
+                : Test{ label, std::move(func) } {}
+            SkippedTest(const std::string& reason, const std::string& label, test_func_t&& func)
+                : SkippedTest{ label, std::move(func) }
+            {
                 skipped_reason_ = reason;
             }
 
@@ -446,7 +459,8 @@ namespace H2OFastTests {
         std::unique_ptr<test_t> make_test(test_func_t&& func) { return make_unique<test_t>(std::move(func)); }
         std::unique_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return make_unique<test_t>(label, std::move(func)); }
         std::unique_ptr<test_t> make_skipped_test(test_func_t&& test) { return make_unique<skipped_test_t>(std::move(test)); }
-        std::unique_ptr<test_t> make_skipped_test(const std::string& reason, test_func_t&& test) { return make_unique<skipped_test_t>(reason, std::move(test)); }
+        std::unique_ptr<test_t> make_skipped_test(const std::string& label, test_func_t&& func) { return make_unique<skipped_test_t>(label, std::move(func)); }
+        std::unique_ptr<test_t> make_skipped_test(const std::string& reason, const std::string& label, test_func_t&& func) { return make_unique<skipped_test_t>(reason, label, std::move(func)); }
 
         // POD containing informations about a test
         struct TestInfos {
@@ -533,8 +547,12 @@ namespace H2OFastTests {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(std::move(func))));
             }
 
-            void skip_test(const std::string& reason, test_func_t&& func) {
-                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(reason, std::move(func))));
+            void skip_test(const std::string& label, test_func_t&& func) {
+                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(label, std::move(func))));
+            }
+
+            void skip_test(const std::string& reason, const std::string& label, test_func_t&& func) {
+                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(reason, label, std::move(func))));
             }
 
             // Run all the tests
@@ -635,42 +653,36 @@ namespace H2OFastTests {
     class RegistryTraversal_ConsoleIO : private IRegistryTraversal<ScenarioName> {
     public:
         RegistryTraversal_ConsoleIO(const registry_manager_t<ScenarioName>& registry) : IRegistryTraversal<ScenarioName>(registry) {}
-        std::ostream& print(std::ostream& os, bool verbose) const {
+        void print(bool verbose) const {
             auto& registry_manager = getRegistryManager();
             const auto test_name = std::string{ H2OFastTests::detail::type_helper<ScenarioName>::name() };
-            os << "UNIT TEST SUMMARY [" << test_name.substr(test_name.find(' ') + 1) << "] [" << registry_manager.getAllTestsExecTimeMs().count() << "ms]:" << std::endl;
+            ColoredPrintf(COLOR_CYAN, "UNIT TEST SUMMARY [%s] [%f ms] : \n", test_name.substr(test_name.find(' ') + 1).c_str(), registry_manager.getAllTestsExecTimeMs().count());
 
-            os << "\tPASSED:" << registry_manager.getPassedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
+            ColoredPrintf(COLOR_GREEN, "\tPASSED: %d/%d\n", registry_manager.getPassedCount(), registry_manager.getAllTestsCount());
             if (verbose) {
                 for (const auto test : registry_manager.getPassedTests()) {
-                    os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl;
+                    ColoredPrintf(COLOR_GREEN, "\t\t[%s] [%f ms]\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count());
                 }
             }
 
-            os << "\tFAILED:" << registry_manager.getFailedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
-            if (verbose) {
-                for (const auto test : registry_manager.getFailedTests()) {
-                    os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
-                        << "\t\tMessage: " << test->getFailureReason() << std::endl;
-                }
+            ColoredPrintf(COLOR_RED, "\tFAILED: %d/%d\n", registry_manager.getFailedCount(), registry_manager.getAllTestsCount());
+            // Always print failed tests
+            for (const auto test : registry_manager.getFailedTests()) {
+                ColoredPrintf(COLOR_RED, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count(), test->getFailureReason().c_str());
             }
 
-            os << "\tSKIPPED:" << registry_manager.getSkippedCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
+            ColoredPrintf(COLOR_YELLOW, "\tSKIPPED: %d/%d\n", registry_manager.getSkippedCount(), registry_manager.getAllTestsCount());
             if (verbose) {
                 for (const auto test : registry_manager.getSkippedTests()) {
-                    os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl;
+                    ColoredPrintf(COLOR_YELLOW, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count(), test->getSkippedReason().c_str());
                 }
             }
 
-            os << "\tERRORS:" << registry_manager.getWithErrorCount() << "/" << registry_manager.getAllTestsCount() << std::endl;
-            if (verbose) {
-                for (const auto test : registry_manager.getWithErrorTests()) {
-                    os << "\t\t[" << test->getLabel(verbose) << "] [" << test->getExecTimeMs().count() << "ms] " << test->getStatus() << std::endl
-                        << "\t\tMessage: " << test->getError() << std::endl;
-                }
+            ColoredPrintf(COLOR_PURPLE, "\tERRORS: %d/%d\n", registry_manager.getWithErrorCount(), registry_manager.getAllTestsCount());
+            // Always print error tests
+            for (const auto test : registry_manager.getWithErrorTests()) {
+                ColoredPrintf(COLOR_PURPLE, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count(), test->getError().c_str());
             }
-
-            return os;
         }
     };
 
@@ -702,7 +714,7 @@ namespace H2OFastTests {
     ScenarioName ## _registry_manager.addObserver(std::shared_ptr<class_name>(instance_ptr))
 
 #define print_result(ScenarioName, verbose) \
-    H2OFastTests::RegistryTraversal_ConsoleIO<ScenarioName>(ScenarioName ## _registry_manager).print(std::cout, (verbose))
+    H2OFastTests::RegistryTraversal_ConsoleIO<ScenarioName>(ScenarioName ## _registry_manager).print(verbose)
 
 #define line_info() \
     &H2OFastTests::line_info_t(__FILE__, "", __LINE__)

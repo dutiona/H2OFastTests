@@ -38,7 +38,7 @@ register_scenario(H2OFastTests_Tests)
     auto epsf_v = 1e-5f;
     auto epsd_v = 1e-5;
 
-    skip_test("Assert::AreEqual(double, tolerance = 1e-5)", [epsd_v]() {
+    skip_test("Test skip", "Assert::AreEqual(double, tolerance = 1e-5)", [epsd_v]() {
         AssertThat(0.).isEqualTo(epsd_v, epsd_v, "Expect 0. == 1e-5");
     });
 
@@ -100,6 +100,7 @@ register_scenario(H2OFastTests_Tests)
     add_test("Assert::AreSame(void*)", []() {
         void* a;
         AssertThat(a).isSameAs(a, "Expect &a == &a");
+        //throw std::runtime_error{ ":(" }; // Checking error display
     });
 
     add_test("Assert::AreNotSame(void*)", []() {
@@ -137,8 +138,6 @@ register_scenario(H2OFastTests_Tests)
 int main(int /*argc*/, char** /*argv*/) {
     run_scenario(H2OFastTests_Tests);
     print_result(H2OFastTests_Tests, true);
-
-    ColoredPrintf(GTestColor::COLOR_RED, "YAY %s", "owww");
 
     std::cout << "Press enter to continue...";
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
