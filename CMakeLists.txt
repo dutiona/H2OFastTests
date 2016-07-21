@@ -13,7 +13,7 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo")
 project (H2OFastTests)
 
 # The version number.
-set (H2OFastTests_VERSION_MAJOR 1)
+set (H2OFastTests_VERSION_MAJOR 2)
 set (H2OFastTests_VERSION_MINOR 0)
  
 configure_file (
