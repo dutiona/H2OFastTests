@@ -8,7 +8,7 @@ if(UNIX)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=gnu++0x")
 endif()
 
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo")
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release;MinSizeRel;RelWithDebInfo")
 
 project (H2OFastTests)
 
@@ -63,6 +63,3 @@ install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests.h
          DESTINATION H2OFastTests)
 install (FILES ${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h
          DESTINATION H2OFastTests)
- 
- set(CONFIGURED_ONCE TRUE CACHE INTERNAL
-    "A flag showing that CMake has configured at least once.")
