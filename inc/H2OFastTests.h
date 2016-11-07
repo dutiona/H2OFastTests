@@ -31,10 +31,8 @@
 #include "H2OFastTests_config.h"
 
 namespace H2OFastTests {
-
     // Implementation details
     namespace detail {
-
         //XCode workaround
 #if __APPLE__
         template<typename T, typename ... Args>
@@ -47,24 +45,38 @@ namespace H2OFastTests {
 
         // Line info struct
         // Holds line number, file name and function name if relevant
-        struct LineInfo {
-            const std::string file_;
-            const std::string func_;
-            const int line_;
-            LineInfo(const char* file, const char* func, int line)
-                : file_(file), func_(func), line_(line)
-            {}
+        class LineInfo {
+        public:
+            LineInfo()
+                : init_(false)
+            {
+            }
 
-            LineInfo& operator=(const LineInfo&) = delete;
+            LineInfo(const char* file, const char* func, int line)
+                : file_(file), func_(func), line_(line), init_(true)
+            {
+            }
+
+            bool isInit() const {
+                return init_;
+            }
+
+            // Basic display
+            friend std::ostream& operator<<(std::ostream& os, const LineInfo& lineInfo) {
+                if (lineInfo.isInit())
+                os << lineInfo.file_ << ":" << lineInfo.line_ << " " << lineInfo.func_;
+                return os;
+            }
+
+        private:
+
+            std::string file_;
+            std::string func_;
+            int line_;
+            bool init_;
         };
 
         using line_info_t = LineInfo;
-
-        // Basic display
-        std::ostream& operator<<(std::ostream& os, const line_info_t& lineInfo) {
-            os << lineInfo.file_ << ":" << lineInfo.line_ << " " << lineInfo.func_;
-            return os;
-        }
 
         // Internal exception raised when a test failed
         // Used by internal test runner and assert tool to communicate over the test
@@ -81,15 +93,10 @@ namespace H2OFastTests {
         using test_failure_t = TestFailure;
 
         // Internal impl for processing an assert and raise the TestFailure Exception
-        void FailureTest(bool condition, const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+        void FailureTest(bool condition, const std::string& message, const line_info_t& lineInfo) {
             std::ostringstream oss;
             if (!condition) {
-                if (lineInfo != nullptr) {
-                    oss << ((message != nullptr) ? message : "") << "\t(" << *lineInfo << ")";
-                }
-                else {
-                    oss << ((message != nullptr) ? message : "");
-                }
+                oss << message << (!lineInfo.isInit() ? "" : std::string{ "\t(" } + lineInfo + ")");
                 throw test_failure_t(oss.str());
             }
         }
@@ -281,7 +288,6 @@ namespace H2OFastTests {
         private:
 
             Expr expr_; // Current value stored
-
         };
 
         // Functor to build an Asserter with template deduction
@@ -289,7 +295,6 @@ namespace H2OFastTests {
         AsserterExpression<Expr> AssertThat(Expr&& expr) {
             return{ std::forward<Expr>(expr) };
         }
-
 
         using test_func_t = std::function<void(void)>;
         using duration_t = std::chrono::duration<double, std::milli>; // ms
@@ -450,7 +455,6 @@ namespace H2OFastTests {
 
             // Put state to skipped and don't run the test
             virtual void run_private() override { status_ = SKIPPED; }
-
         };
 
         using skipped_test_t = detail::SkippedTest;
@@ -479,7 +483,7 @@ namespace H2OFastTests {
             static bool before(const std::type_info& rhs) { return typeid(Type).before(rhs); }
             static const char* raw_name() { return typeid(Type).raw_name(); }
             static const char* name() { return typeid(Type).name(); }
-            static size_t hash_code() { return typeid(C).hash_code(); }
+            static size_t hash_code() { return typeid(Type).hash_code(); }
             static std::type_index type_index() { return std::type_index(typeid(Type)); }
             using type = Type;
             template<class LhsType, class RhsType>
@@ -581,6 +585,8 @@ namespace H2OFastTests {
                 run_ = true;
             }
 
+            // describe test suite
+            virtual void describe() {}
 
             // Get informations
 
@@ -608,7 +614,6 @@ namespace H2OFastTests {
             std::vector<const test_t*> tests_failed_;
             std::vector<const test_t*> tests_skipped_;
             std::vector<const test_t*> tests_with_error_;
-
         };
 
         template<class ScenarioName>
@@ -694,18 +699,22 @@ namespace H2OFastTests {
                 << "Status: " << infos.test.getStatus() << std::endl;
         }
     };
-
 }
 
 //Helper macros to use the unit test suit
 #define register_scenario(ScenarioName) \
     struct ScenarioName : H2OFastTests::detail::RegistryManager<ScenarioName> { \
         ScenarioName(std::function<bool(void)> feeder); \
+        virtual void describe(); \
     }; \
     static ScenarioName ScenarioName ## _registry_manager{ []() { \
         return H2OFastTests::detail::get_registry().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), H2OFastTests::detail::test_list_t{}).second; \
     } }; \
-    ScenarioName::ScenarioName(std::function<bool(void)> feeder) : RegistryManager<ScenarioName>{ feeder }
+    ScenarioName::ScenarioName(std::function<bool(void)> feeder) \
+        : H2OFastTests::detail::RegistryManager<ScenarioName>{ feeder } { \
+        describe(); \
+    } \
+    void ScenarioName::describe()
 
 #define run_scenario(ScenarioName) \
     ScenarioName ## _registry_manager.run_tests();
@@ -717,8 +726,8 @@ namespace H2OFastTests {
     H2OFastTests::RegistryTraversal_ConsoleIO<ScenarioName>(ScenarioName ## _registry_manager).print(verbose)
 
 #define line_info() \
-    &H2OFastTests::line_info_t(__FILE__, "", __LINE__)
+    H2OFastTests::line_info_t(__FILE__, "", __LINE__)
 #define line_info_f() \
-    &H2OFastTests::line_info_t(__FILE__, __FUNCTION__, __LINE__)
+    H2OFastTests::line_info_t(__FILE__, __FUNCTION__, __LINE__)
 
 #endif

@@ -14,9 +14,7 @@
 #include <limits>
 #include <stdexcept>
 
-
 using namespace H2OFastTests::Asserter;
-
 
 struct CustomClass {
     bool value;
