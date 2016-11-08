@@ -76,8 +76,6 @@ namespace H2OFastTests {
             bool init_;
         };
 
-        using line_info_t = LineInfo;
-
         // Internal exception raised when a test failed
         // Used by internal test runner and assert tool to communicate over the test
         class TestFailure : public std::exception {
@@ -90,14 +88,18 @@ namespace H2OFastTests {
             const std::string message_;
         };
 
-        using test_failure_t = TestFailure;
-
         // Internal impl for processing an assert and raise the TestFailure Exception
-        void FailureTest(bool condition, const std::string& message, const line_info_t& lineInfo) {
+        void FailureTest(bool condition, const std::string& message, const LineInfo& lineInfo) {
             std::ostringstream oss;
             if (!condition) {
-                oss << message << (!lineInfo.isInit() ? "" : std::string{ "\t(" } + lineInfo + ")");
-                throw test_failure_t(oss.str());
+                if (lineInfo.isInit()) {
+                    oss << message << "\t(" << lineInfo << ")";
+                }
+                else {
+                    oss << message;
+                }
+                
+                throw TestFailure(oss.str());
             }
         }
 
@@ -106,7 +108,7 @@ namespace H2OFastTests {
         class AsserterExpression {
         public:
 
-            using empty_expression_t = AsserterExpression<std::nullptr_t>;
+            using EmptyExpression = AsserterExpression<std::nullptr_t>;
 
             template<class E>
             friend AsserterExpression<E> AssertThat(E&& expr);
@@ -130,54 +132,54 @@ namespace H2OFastTests {
             }
 
             // True condition
-            empty_expression_t isTrue(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isTrue(const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(expr_, message, lineInfo);
                 return{};
             }
 
             // False condition
-            empty_expression_t isFalse(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isFalse(const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(!expr_, message, lineInfo);
                 return{};
             }
 
             // Verify that two references refer to the same object instance (identity):
             template<class T>
-            empty_expression_t isSameAs(const T& actual,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isSameAs(const T& actual,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(&expr_ == &actual, message, lineInfo);
                 return{};
             }
 
             // Verify that two references do not refer to the same object instance (identity):
             template<class T>
-            empty_expression_t isNotSameAs(const T& actual,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNotSameAs(const T& actual,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(!(&expr_ == &actual), message, lineInfo);
                 return{};
             }
 
             // Verify that a pointer is nullptr:
-            empty_expression_t isNull(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNull(const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(expr_ == nullptr, message, lineInfo);
                 return{};
             }
 
             // Verify that a pointer is not nullptr:
-            empty_expression_t isNotNull(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNotNull(const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(expr_ != nullptr, message, lineInfo);
                 return{};
             }
 
             // Force the test case result to be fail:
-            empty_expression_t fail(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression fail(const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(false, message, lineInfo);
                 return{};
             }
 
             // Verify that a function raises an exception:
             template<class ExpectedException>
-            empty_expression_t expectException(const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression expectException(const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 try {
                     expr_();
                 }
@@ -191,31 +193,31 @@ namespace H2OFastTests {
 
             // Invoque operator == on T
             template<class T>
-            empty_expression_t isEqualTo(const T& expected,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isEqualTo(const T& expected,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(expr_ == expected, message, lineInfo);
                 return{};
             }
 
             // Check if 2 doubles are almost equals (tolerance given)
-            empty_expression_t isEqualTo(double expected, double tolerance,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isEqualTo(double expected, double tolerance,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 double diff = expected - expr_;
                 FailureTest(std::abs(diff) <= std::abs(tolerance), message, lineInfo);
                 return{};
             }
 
             // Check if 2 floats are almost equals (tolerance given)
-            empty_expression_t isEqualTo(float expected, float tolerance,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isEqualTo(float expected, float tolerance,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 float diff = expected - expr_;
                 FailureTest(std::abs(diff) <= std::abs(tolerance), message, lineInfo);
                 return{};
             }
 
             // Check if 2 char* are equals, considering the case by default
-            empty_expression_t isEqualTo(const char* expected, bool ignoreCase = false,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isEqualTo(const char* expected, bool ignoreCase,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 auto expected_str = std::string{ expected };
                 auto expr_str = std::string{ expr_ };
                 if (ignoreCase) {
@@ -227,8 +229,8 @@ namespace H2OFastTests {
             }
 
             // Check if 2 strings are equals, considering the case by default
-            empty_expression_t isEqualTo(std::string expected, bool ignoreCase = false,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isEqualTo(std::string expected, bool ignoreCase,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 if (ignoreCase) {
                     std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
                     std::transform(expr_.begin(), expr_.end(), expr_.begin(), ::tolower);
@@ -239,31 +241,31 @@ namespace H2OFastTests {
 
             // Invoque !operator == on T
             template<class T>
-            empty_expression_t isNotEqualTo(const T& notExpected,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNotEqualTo(const T& notExpected,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 FailureTest(!(notExpected == expr_), message, lineInfo);
                 return{};
             }
 
             // Check if 2 doubles are not almost equals (tolerance given)
-            empty_expression_t isNotEqualTo(double notExpected, double tolerance,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNotEqualTo(double notExpected, double tolerance,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 double diff = notExpected - expr_;
                 FailureTest(std::abs(diff) > std::abs(tolerance), message, lineInfo);
                 return{};
             }
 
             // Check if 2 floats are not almost equals (tolerance given)
-            empty_expression_t isNotEqualTo(float notExpected, float expr_, float tolerance,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNotEqualTo(float notExpected, float expr_, float tolerance,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 float diff = notExpected - expr_;
                 FailureTest(std::abs(diff) > std::abs(tolerance), message, lineInfo);
                 return{};
             }
 
             // Check if 2 char* are not equals, considering the case by default
-            empty_expression_t isNotEqualTo(const char* notExpected, bool ignoreCase = false,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNotEqualTo(const char* notExpected, bool ignoreCase,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 auto notExpected_str = std::string{ notExpected };
                 auto expr_str = std::string{ expr_ };
                 if (ignoreCase) {
@@ -275,8 +277,8 @@ namespace H2OFastTests {
             }
 
             // Check if 2 strings are not equals, considering the case by default
-            empty_expression_t isNotEqualTo(std::string notExpected, bool ignoreCase = false,
-                const char* message = nullptr, const line_info_t* lineInfo = nullptr) {
+            EmptyExpression isNotEqualTo(std::string notExpected, bool ignoreCase,
+                const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 if (ignoreCase) {
                     std::transform(notExpected.begin(), notExpected.end(), notExpected.begin(), ::tolower);
                     std::transform(expr_.begin(), expr_.end(), expr_.begin(), ::tolower);
@@ -296,8 +298,8 @@ namespace H2OFastTests {
             return{ std::forward<Expr>(expr) };
         }
 
-        using test_func_t = std::function<void(void)>;
-        using duration_t = std::chrono::duration<double, std::milli>; // ms
+        using TestFunctor = std::function<void(void)>;
+        using Duration = std::chrono::duration<double, std::milli>; // ms
 
         // Standard class discribing a test
         class Test {
@@ -317,12 +319,12 @@ namespace H2OFastTests {
             // All available constructors
             Test()
                 : Test({}, []() {}) {}
-            Test(const test_func_t&& test)
+            Test(const TestFunctor&& test)
                 : Test("", std::move(test)) {}
             Test(const std::string& label)
                 : Test(label, []() {}) {}
-            Test(const std::string& label, const test_func_t&& test)
-                : test_holder_(make_unique<test_func_t>(std::move(test))), label_(label), status_(NONE)
+            Test(const std::string& label, const TestFunctor&& test)
+                : test_holder_(make_unique<TestFunctor>(std::move(test))), label_(label), status_(NONE)
             {}
 
             // Copy forbidden
@@ -355,7 +357,7 @@ namespace H2OFastTests {
             const std::string& getFailureReason() const { return getFailureReason_private(); }
             const std::string& getSkippedReason() const { return getSkippedReason_private(); }
             const std::string& getError() const { return getError_private(); }
-            duration_t getExecTimeMs() const { return getExecTimeMs_private(); }
+            Duration getExecTimeMs() const { return getExecTimeMs_private(); }
             Status getStatus() const { return getStatus_private(); }
 
         protected:
@@ -369,7 +371,7 @@ namespace H2OFastTests {
                     (*test_holder_)(); /* /!\ Here is the test call /!\ */
                     status_ = PASSED;
                 }
-                catch (const test_failure_t& failure) {
+                catch (const TestFailure& failure) {
                     status_ = FAILED;
                     failure_reason_ = failure.what();
                 }
@@ -389,13 +391,13 @@ namespace H2OFastTests {
             virtual const std::string& getFailureReason_private() const { return failure_reason_; }
             virtual const std::string& getSkippedReason_private() const { return skipped_reason_; }
             virtual const std::string& getError_private() const { return error_; }
-            virtual duration_t getExecTimeMs_private() const { return exec_time_ms_; }
+            virtual Duration getExecTimeMs_private() const { return exec_time_ms_; }
             virtual Status getStatus_private() const { return status_; }
 
         protected:
 
-            duration_t exec_time_ms_;
-            std::unique_ptr<test_func_t> test_holder_;
+            Duration exec_time_ms_;
+            std::unique_ptr<TestFunctor> test_holder_;
             std::string label_;
             std::string failure_reason_;
             std::string skipped_reason_;
@@ -406,24 +408,21 @@ namespace H2OFastTests {
             friend class RegistryManager;
         };
 
-        using test_t = detail::Test;
-        using test_status_t = detail::Test::Status;
-
-        std::ostream& operator<<(std::ostream& os, test_t::Status status) {
+        std::ostream& operator<<(std::ostream& os, detail::Test::Status status) {
             switch (status)    {
-            case test_status_t::PASSED:
+            case detail::Test::Status::PASSED:
                 os << "PASSED";
                 break;
-            case test_status_t::FAILED:
+            case detail::Test::Status::FAILED:
                 os << "FAILED";
                 break;
-            case test_status_t::ERROR:
+            case detail::Test::Status::ERROR:
                 os << "ERROR";
                 break;
-            case test_status_t::SKIPPED:
+            case detail::Test::Status::SKIPPED:
                 os << "SKIPPED";
                 break;
-            case test_status_t::NONE:
+            case detail::Test::Status::NONE:
             default:
                 os << "NOT RUN YET";
                 break;
@@ -431,7 +430,7 @@ namespace H2OFastTests {
             return os;
         }
 
-        std::string to_string(test_t::Status status) {
+        std::string to_string(detail::Test::Status status) {
             std::ostringstream os;
             os << status;
             return os.str();
@@ -441,11 +440,11 @@ namespace H2OFastTests {
         class SkippedTest : public Test {
         public:
 
-            SkippedTest(test_func_t&& func)
+            SkippedTest(TestFunctor&& func)
                 : Test{ std::move(func) } {}
-            SkippedTest(const std::string& label, test_func_t&& func)
+            SkippedTest(const std::string& label, TestFunctor&& func)
                 : Test{ label, std::move(func) } {}
-            SkippedTest(const std::string& reason, const std::string& label, test_func_t&& func)
+            SkippedTest(const std::string& reason, const std::string& label, TestFunctor&& func)
                 : SkippedTest{ label, std::move(func) }
             {
                 skipped_reason_ = reason;
@@ -457,26 +456,22 @@ namespace H2OFastTests {
             virtual void run_private() override { status_ = SKIPPED; }
         };
 
-        using skipped_test_t = detail::SkippedTest;
-
         // Helper functions to build/skip a test case
-        std::unique_ptr<test_t> make_test(test_func_t&& func) { return make_unique<test_t>(std::move(func)); }
-        std::unique_ptr<test_t> make_test(const std::string& label, test_func_t&& func) { return make_unique<test_t>(label, std::move(func)); }
-        std::unique_ptr<test_t> make_skipped_test(test_func_t&& test) { return make_unique<skipped_test_t>(std::move(test)); }
-        std::unique_ptr<test_t> make_skipped_test(const std::string& label, test_func_t&& func) { return make_unique<skipped_test_t>(label, std::move(func)); }
-        std::unique_ptr<test_t> make_skipped_test(const std::string& reason, const std::string& label, test_func_t&& func) { return make_unique<skipped_test_t>(reason, label, std::move(func)); }
+        std::unique_ptr<Test> make_test(TestFunctor&& func) { return make_unique<Test>(std::move(func)); }
+        std::unique_ptr<Test> make_test(const std::string& label, TestFunctor&& func) { return make_unique<Test>(label, std::move(func)); }
+        std::unique_ptr<Test> make_skipped_test(TestFunctor&& test) { return make_unique<SkippedTest>(std::move(test)); }
+        std::unique_ptr<Test> make_skipped_test(const std::string& label, TestFunctor&& func) { return make_unique<SkippedTest>(label, std::move(func)); }
+        std::unique_ptr<Test> make_skipped_test(const std::string& reason, const std::string& label, TestFunctor&& func) { return make_unique<SkippedTest>(reason, label, std::move(func)); }
 
         // POD containing informations about a test
-        struct TestInfos {
-            using status_t = test_status_t;
+        struct TestInfo {
+            using Status = detail::Test::Status;
 
-            TestInfos(const test_t& t) : test(t) {}
-            TestInfos& operator=(const TestInfos&) = delete;
+            TestInfo(const Test& t) : test(t) {}
+            TestInfo& operator=(const TestInfo&) = delete;
 
-            const test_t& test;
+            const Test& test;
         };
-
-        using tests_infos_t = TestInfos;
 
         template<class Type>
         struct type_helper {
@@ -495,67 +490,63 @@ namespace H2OFastTests {
         // Interface for making an observer
         class IRegistryObserver {
         public:
-            virtual void update(const tests_infos_t& infos) const = 0;
+            virtual void update(const TestInfo& infos) const = 0;
         };
-
-        using registry_observer_t = IRegistryObserver;
 
         // Implementation of the observable part of the DP observer
         class IRegistryObservable {
         public:
-            void notify(const tests_infos_t& infos) const {
+            void notify(const TestInfo& infos) const {
                 for (auto& observer : list_observers_) {
                     observer->update(infos);
                 }
             }
-            void addObserver(const std::shared_ptr<registry_observer_t>& observer) { list_observers_.insert(observer); }
-            void removeObserver(const std::shared_ptr<registry_observer_t>& observer) { list_observers_.erase(observer); }
+            void addObserver(const std::shared_ptr<IRegistryObserver>& observer) { list_observers_.insert(observer); }
+            void removeObserver(const std::shared_ptr<IRegistryObserver>& observer) { list_observers_.erase(observer); }
         private:
-            std::set<std::shared_ptr<registry_observer_t>> list_observers_;
+            std::set<std::shared_ptr<IRegistryObserver>> list_observers_;
         };
 
-        using registry_observable_t = IRegistryObservable;
-
         // Global static registry storage object
-        using test_list_t = std::vector<std::unique_ptr<test_t>>;
-        using registry_storage_t = std::map<std::type_index, test_list_t>;
+        using TestList = std::vector<std::unique_ptr<Test>>;
+        using ResgistryStorage = std::map<std::type_index, TestList>;
 
-        registry_storage_t& get_registry() {
-            static registry_storage_t registry;
+        ResgistryStorage& get_registry() {
+            static ResgistryStorage registry;
             return registry;
         }
 
         // Manage a registry in a static context
         template<class ScenarioName>
-        class RegistryManager : public registry_observable_t{
+        class RegistryManager : public IRegistryObservable{
         public:
 
             RegistryManager(std::function<bool(void)> feeder)
-                : run_(false), exec_time_ms_accumulator_(duration_t{ 0 }) {
+                : run_(false), exec_time_ms_accumulator_(Duration{ 0 }) {
                 feeder();
             }
 
             //Recursive variadic to iterate over the test pack
-            void add_test(test_t&& test) {
+            void add_test(Test&& test) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(test));
             }
 
-            void add_test(test_func_t&& func) {
+            void add_test(TestFunctor&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(std::move(func))));
             }
 
-            void add_test(const std::string& label, test_func_t&& func) {
+            void add_test(const std::string& label, TestFunctor&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(label, std::move(func))));
             }
-            void skip_test(test_func_t&& func) {
+            void skip_test(TestFunctor&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(std::move(func))));
             }
 
-            void skip_test(const std::string& label, test_func_t&& func) {
+            void skip_test(const std::string& label, TestFunctor&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(label, std::move(func))));
             }
 
-            void skip_test(const std::string& reason, const std::string& label, test_func_t&& func) {
+            void skip_test(const std::string& reason, const std::string& label, TestFunctor&& func) {
                 get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(reason, label, std::move(func))));
             }
 
@@ -565,18 +556,18 @@ namespace H2OFastTests {
                 for (auto& test : tests) {
                     test->run();
                     exec_time_ms_accumulator_ += test->getExecTimeMs();
-                    notify(tests_infos_t{ *test });
+                    notify(TestInfo{ *test });
                     switch (test->getStatus()) {
-                    case test_status_t::PASSED:
+                    case TestInfo::Status::PASSED:
                         tests_passed_.push_back(test.get());
                         break;
-                    case test_status_t::FAILED:
+                    case TestInfo::Status::FAILED:
                         tests_failed_.push_back(test.get());
                         break;
-                    case test_status_t::SKIPPED:
+                    case TestInfo::Status::SKIPPED:
                         tests_skipped_.push_back(test.get());
                         break;
-                    case test_status_t::ERROR:
+                    case TestInfo::Status::ERROR:
                         tests_with_error_.push_back(test.get());
                         break;
                     default: break;
@@ -591,33 +582,30 @@ namespace H2OFastTests {
             // Get informations
 
             size_t getPassedCount() const { return run_ ? tests_passed_.size() : 0; }
-            const std::vector<const test_t*>& getPassedTests() const { return tests_passed_; }
+            const std::vector<const Test*>& getPassedTests() const { return tests_passed_; }
 
             size_t getFailedCount() const { return run_ ? tests_failed_.size() : 0; }
-            const std::vector<const test_t*>& getFailedTests() const { return tests_failed_; }
+            const std::vector<const Test*>& getFailedTests() const { return tests_failed_; }
 
             size_t getSkippedCount() const { return run_ ? tests_skipped_.size() : 0; }
-            const std::vector<const test_t*>& getSkippedTests() const { return tests_skipped_; }
+            const std::vector<const Test*>& getSkippedTests() const { return tests_skipped_; }
 
             size_t getWithErrorCount() const { return run_ ? tests_with_error_.size() : 0; }
-            const std::vector<const test_t*>& getWithErrorTests() const { return tests_with_error_; }
+            const std::vector<const Test*>& getWithErrorTests() const { return tests_with_error_; }
 
             size_t getAllTestsCount() const { return run_ ? get_registry()[type_helper<ScenarioName>::type_index()].size() : 0; }
-            const test_list_t& getAllTests() const { return get_registry()[type_helper<ScenarioName>::type_index()]; }
-            duration_t getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : duration_t{ 0 }; }
+            const TestList& getAllTests() const { return get_registry()[type_helper<ScenarioName>::type_index()]; }
+            Duration getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : Duration{ 0 }; }
 
         private:
 
             bool run_;
-            duration_t exec_time_ms_accumulator_;
-            std::vector<const test_t*> tests_passed_;
-            std::vector<const test_t*> tests_failed_;
-            std::vector<const test_t*> tests_skipped_;
-            std::vector<const test_t*> tests_with_error_;
+            Duration exec_time_ms_accumulator_;
+            std::vector<const Test*> tests_passed_;
+            std::vector<const Test*> tests_failed_;
+            std::vector<const Test*> tests_skipped_;
+            std::vector<const Test*> tests_with_error_;
         };
-
-        template<class ScenarioName>
-        using registry_manager_t = RegistryManager<ScenarioName>;
     }
 
     /*
@@ -627,12 +615,12 @@ namespace H2OFastTests {
     */
 
     // Public accessible types
-    using line_info_t = detail::line_info_t;
-    using test_infos_t = detail::tests_infos_t;
-    using registry_storage_t = detail::registry_storage_t;
-    using registry_observer_t = detail::IRegistryObserver;
+    using detail::LineInfo;
+    using detail::TestInfo;
+    using detail::ResgistryStorage;
+    using detail::IRegistryObserver;
     template<class ScenarioName>
-    using registry_manager_t = detail::RegistryManager<ScenarioName>;
+    using RegistryManager = detail::RegistryManager<ScenarioName>;
 
     // Asserter exposition
     namespace Asserter {
@@ -645,19 +633,19 @@ namespace H2OFastTests {
     template<class ScenarioName>
     class IRegistryTraversal {
     public:
-        IRegistryTraversal(const registry_manager_t<ScenarioName>& registry) : registry_(registry) {}
+        IRegistryTraversal(const RegistryManager<ScenarioName>& registry) : registry_(registry) {}
         virtual ~IRegistryTraversal() {}
     protected:
-        const registry_manager_t<ScenarioName>& getRegistryManager() const { return registry_; }
+        const RegistryManager<ScenarioName>& getRegistryManager() const { return registry_; }
     private:
-        registry_manager_t<ScenarioName> registry_;
+        RegistryManager<ScenarioName> registry_;
     };
 
     // Trivial impl for console display results
     template<class ScenarioName>
     class RegistryTraversal_ConsoleIO : private IRegistryTraversal<ScenarioName> {
     public:
-        RegistryTraversal_ConsoleIO(const registry_manager_t<ScenarioName>& registry) : IRegistryTraversal<ScenarioName>(registry) {}
+        RegistryTraversal_ConsoleIO(const RegistryManager<ScenarioName>& registry) : IRegistryTraversal<ScenarioName>(registry) {}
         void print(bool verbose) const {
             auto& registry_manager = getRegistryManager();
             const auto test_name = std::string{ H2OFastTests::detail::type_helper<ScenarioName>::name() };
@@ -692,9 +680,9 @@ namespace H2OFastTests {
     };
 
     // Observer impl example
-    class ConsoleIO_Observer : public registry_observer_t {
-        virtual void update(const test_infos_t& infos) const override {
-            std::cout << (infos.test.getStatus() == test_infos_t::status_t::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
+    class ConsoleIO_Observer : public IRegistryObserver {
+        virtual void update(const TestInfo& infos) const override {
+            std::cout << (infos.test.getStatus() == TestInfo::Status::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
                 << infos.test.getLabel(false) << "] [" << infos.test.getExecTimeMs().count() << "ms]:" << std::endl
                 << "Status: " << infos.test.getStatus() << std::endl;
         }
@@ -703,15 +691,15 @@ namespace H2OFastTests {
 
 //Helper macros to use the unit test suit
 #define register_scenario(ScenarioName) \
-    struct ScenarioName : H2OFastTests::detail::RegistryManager<ScenarioName> { \
+    struct ScenarioName : H2OFastTests::RegistryManager<ScenarioName> { \
         ScenarioName(std::function<bool(void)> feeder); \
         virtual void describe(); \
     }; \
     static ScenarioName ScenarioName ## _registry_manager{ []() { \
-        return H2OFastTests::detail::get_registry().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), H2OFastTests::detail::test_list_t{}).second; \
+        return H2OFastTests::detail::get_registry().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), H2OFastTests::detail::TestList{}).second; \
     } }; \
     ScenarioName::ScenarioName(std::function<bool(void)> feeder) \
-        : H2OFastTests::detail::RegistryManager<ScenarioName>{ feeder } { \
+        : RegistryManager<ScenarioName>{ feeder } { \
         describe(); \
     } \
     void ScenarioName::describe()
