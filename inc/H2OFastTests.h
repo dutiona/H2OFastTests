@@ -112,9 +112,6 @@ namespace H2OFastTests {
 
             using EmptyExpression = AsserterExpression<std::nullptr_t>;
 
-            template<class E>
-            friend AsserterExpression<E> AssertThat(E&& expr);
-
             AsserterExpression()
                 : expr_(nullptr)
             {}
