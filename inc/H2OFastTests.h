@@ -57,6 +57,8 @@ namespace H2OFastTests {
             {
             }
 
+            ~LineInfo() {}
+
             bool isInit() const {
                 return init_;
             }
@@ -647,7 +649,7 @@ namespace H2OFastTests {
     public:
         RegistryTraversal_ConsoleIO(const RegistryManager<ScenarioName>& registry) : IRegistryTraversal<ScenarioName>(registry) {}
         void print(bool verbose) const {
-            auto& registry_manager = getRegistryManager();
+            auto& registry_manager = this->getRegistryManager();
             const auto test_name = std::string{ H2OFastTests::detail::type_helper<ScenarioName>::name() };
             ColoredPrintf(COLOR_CYAN, "UNIT TEST SUMMARY [%s] [%f ms] : \n", test_name.substr(test_name.find(' ') + 1).c_str(), registry_manager.getAllTestsExecTimeMs().count());
 
