@@ -408,21 +408,21 @@ namespace H2OFastTests {
             friend class RegistryManager;
         };
 
-        std::ostream& operator<<(std::ostream& os, detail::Test::Status status) {
+        std::ostream& operator<<(std::ostream& os, Test::Status status) {
             switch (status)    {
-            case detail::Test::Status::PASSED:
+            case Test::Status::PASSED:
                 os << "PASSED";
                 break;
-            case detail::Test::Status::FAILED:
+            case Test::Status::FAILED:
                 os << "FAILED";
                 break;
-            case detail::Test::Status::ERROR:
+            case Test::Status::ERROR:
                 os << "ERROR";
                 break;
-            case detail::Test::Status::SKIPPED:
+            case Test::Status::SKIPPED:
                 os << "SKIPPED";
                 break;
-            case detail::Test::Status::NONE:
+            case Test::Status::NONE:
             default:
                 os << "NOT RUN YET";
                 break;
@@ -430,7 +430,7 @@ namespace H2OFastTests {
             return os;
         }
 
-        std::string to_string(detail::Test::Status status) {
+        std::string to_string(Test::Status status) {
             std::ostringstream os;
             os << status;
             return os.str();
@@ -465,7 +465,7 @@ namespace H2OFastTests {
 
         // POD containing informations about a test
         struct TestInfo {
-            using Status = detail::Test::Status;
+            using Status = Test::Status;
 
             TestInfo(const Test& t) : test(t) {}
             TestInfo& operator=(const TestInfo&) = delete;
