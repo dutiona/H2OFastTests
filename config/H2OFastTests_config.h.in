@@ -130,7 +130,6 @@
 
 #endif  // H2OFT_OS_LINUX
 
-
 #if H2OFT_OS_WINDOWS
 # define vsnprintf _vsnprintf
 #endif  // H2OFT_OS_WINDOWS
@@ -168,9 +167,7 @@ struct _RTL_CRITICAL_SECTION;
 # define H2OFT_DISABLE_MSC_WARNINGS_POP_()
 #endif
 
-
 namespace posix {
-
     // Functions with a different name on Windows.
 
 #if H2OFT_OS_WINDOWS
@@ -200,33 +197,10 @@ namespace posix {
 
 #endif  // H2OFT_OS_WINDOWS
 
-    // Functions deprecated by MSVC 8.0.
-
-    H2OFT_DISABLE_MSC_WARNINGS_PUSH_(4996 /* deprecated function */)
-
-
-    inline const char* GetEnv(const char* name) {
-#if H2OFT_OS_WINDOWS_MOBILE || H2OFT_OS_WINDOWS_PHONE | H2OFT_OS_WINDOWS_RT
-        // We are on Windows CE, which has no environment variables.
-        static_cast<void>(name);  // To prevent 'unused argument' warning.
-        return NULL;
-#elif defined(__BORLANDC__) || defined(__SunOS_5_8) || defined(__SunOS_5_9)
-        // Environment variables which we programmatically clear will be set to the
-        // empty string rather than unset (NULL).  Handle that case.
-        const char* const env = getenv(name);
-        return (env != NULL && env[0] != '\0') ? env : NULL;
-#else
-        return getenv(name);
-#endif
-    }
-
-    H2OFT_DISABLE_MSC_WARNINGS_POP_()
-
 }  // namespace posix
 
 #define FOREGROUND_INTENSITY 0x0008 // text color is intensified.
 #define BACKGROUND_INTENSITY 0x0080 // background color is intensified.
-
 
 enum H2OFTColor {
     COLOR_DEFAULT,
@@ -257,15 +231,15 @@ WORD GetForegroundColorAttribute(H2OFTColor color) {
 /*
 // Returns the character attribute for the given color.
 WORD GetBackgroundColorAttribute(H2OFTColor color) {
-    switch (color) {
-    case COLOR_RED:    return BACKGROUND_RED;
-    case COLOR_BLUE:   return BACKGROUND_BLUE;
-    case COLOR_GREEN:  return BACKGROUND_GREEN;
-    case COLOR_YELLOW: return BACKGROUND_RED | BACKGROUND_GREEN;
-    case COLOR_PURPLE: return BACKGROUND_RED | BACKGROUND_BLUE;
-    case COLOR_CYAN:   return BACKGROUND_BLUE | BACKGROUND_GREEN;
-    default:           return 0;
-    }
+switch (color) {
+case COLOR_RED:    return BACKGROUND_RED;
+case COLOR_BLUE:   return BACKGROUND_BLUE;
+case COLOR_GREEN:  return BACKGROUND_GREEN;
+case COLOR_YELLOW: return BACKGROUND_RED | BACKGROUND_GREEN;
+case COLOR_PURPLE: return BACKGROUND_RED | BACKGROUND_BLUE;
+case COLOR_CYAN:   return BACKGROUND_BLUE | BACKGROUND_GREEN;
+default:           return 0;
+}
 }
 */
 
@@ -305,8 +279,26 @@ bool ShouldUseColor(bool stdout_is_tty) {
         // console there does support colors.
         return stdout_is_tty;
 #else
+#   if H2OFT_OS_WINDOWS_MOBILE || H2OFT_OS_WINDOWS_PHONE | H2OFT_OS_WINDOWS_RT
+        // We are on Windows CE, which has no environment variables.
+        const std::string term = NULL;
+#   elif defined(__BORLANDC__) || defined(__SunOS_5_8) || defined(__SunOS_5_9)
+        // Environment variables which we programmatically clear will be set to the
+        // empty string rather than unset (NULL).  Handle that case.
+        const char* const env = getenv("TERM");
+        const std::string term = std::string{ (env != NULL && env[0] != '\0') ? env : NULL };
+#   else
+        char* buffer = nullptr;
+        size_t sz = 0;
+        if (_dupenv_s(&buffer, &sz, "TERM") == 0 && buffer == nullptr)
+        {
+            return stdout_is_tty;
+        }
+        const std::string term = std::string{ buffer };
+#       define FREE_BUFFER free(buffer);
+#   endif
+        
         // On non-Windows platforms, we rely on the TERM variable.
-        const std::string term = posix::GetEnv("TERM");
         const bool term_supports_color =
             term == "xterm" ||
             term == "xterm-color" ||
@@ -319,8 +311,15 @@ bool ShouldUseColor(bool stdout_is_tty) {
             term == "rxvt-unicode-256color" ||
             term == "linux" ||
             term == "cygwin";
+        
+#       ifdef FREE_BUFFER
+        FREE_BUFFER
+#       undef FREE_BUFFER
+#       endif
+
+
         return stdout_is_tty && term_supports_color;
-#endif  // H2OFT_OS_WINDOWS
+#   endif  // H2OFT_OS_WINDOWS
     }
 
     return H2OFT_color == "yes" ||
@@ -331,7 +330,6 @@ bool ShouldUseColor(bool stdout_is_tty) {
     // value is neither one of these nor "auto", we treat it as "no" to
     // be conservative.
 }
-
 
 // Helpers for printing colored strings to stdout. Note that on Windows, we
 // cannot simply emit special characters and have the terminal change colors.
