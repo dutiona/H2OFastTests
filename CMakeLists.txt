@@ -9,6 +9,7 @@ if(UNIX)
 endif()
 
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release;MinSizeRel;RelWithDebInfo")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project (H2OFastTests)
 

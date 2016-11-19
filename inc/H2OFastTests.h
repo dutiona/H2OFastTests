@@ -348,6 +348,10 @@ namespace H2OFastTests {
                 return std::move(*this);
             }
 
+			Test(std::reference_wrapper<Test> test)
+				: Test(std::move(test.get()))
+			{}
+
             // Virtual destructor impl
             virtual ~Test() {}
 
@@ -557,17 +561,17 @@ namespace H2OFastTests {
                     exec_time_ms_accumulator_ += test->getExecTimeMs();
                     notify(TestInfo{ *test });
                     switch (test->getStatus()) {
-                    case TestInfo::Status::PASSED:
-                        tests_passed_.push_back(test.get());
+					case Test::Status::PASSED:
+                        tests_passed_.push_back(std::cref(*test));
                         break;
-                    case TestInfo::Status::FAILED:
-                        tests_failed_.push_back(test.get());
+                    case Test::Status::FAILED:
+                        tests_failed_.push_back(std::cref(*test));
                         break;
-                    case TestInfo::Status::SKIPPED:
-                        tests_skipped_.push_back(test.get());
+                    case Test::Status::SKIPPED:
+                        tests_skipped_.push_back(std::cref(*test));
                         break;
-                    case TestInfo::Status::ERROR:
-                        tests_with_error_.push_back(test.get());
+                    case Test::Status::ERROR:
+                        tests_with_error_.push_back(std::cref(*test));
                         break;
                     default: break;
                     }
@@ -581,16 +585,16 @@ namespace H2OFastTests {
             // Get informations
 
             size_t getPassedCount() const { return run_ ? tests_passed_.size() : 0; }
-            const std::vector<const Test*>& getPassedTests() const { return tests_passed_; }
+            const std::vector<std::reference_wrapper<const Test>>& getPassedTests() const { return tests_passed_; }
 
             size_t getFailedCount() const { return run_ ? tests_failed_.size() : 0; }
-            const std::vector<const Test*>& getFailedTests() const { return tests_failed_; }
+            const std::vector<std::reference_wrapper<const Test >>& getFailedTests() const { return tests_failed_; }
 
             size_t getSkippedCount() const { return run_ ? tests_skipped_.size() : 0; }
-            const std::vector<const Test*>& getSkippedTests() const { return tests_skipped_; }
+            const std::vector<std::reference_wrapper<const Test>>& getSkippedTests() const { return tests_skipped_; }
 
             size_t getWithErrorCount() const { return run_ ? tests_with_error_.size() : 0; }
-            const std::vector<const Test*>& getWithErrorTests() const { return tests_with_error_; }
+            const std::vector<std::reference_wrapper<const Test>>& getWithErrorTests() const { return tests_with_error_; }
 
             size_t getAllTestsCount() const { return run_ ? get_registry()[type_helper<ScenarioName>::type_index()].size() : 0; }
             const TestList& getAllTests() const { return get_registry()[type_helper<ScenarioName>::type_index()]; }
@@ -600,10 +604,11 @@ namespace H2OFastTests {
 
             bool run_;
             Duration exec_time_ms_accumulator_;
-            std::vector<const Test*> tests_passed_;
-            std::vector<const Test*> tests_failed_;
-            std::vector<const Test*> tests_skipped_;
-            std::vector<const Test*> tests_with_error_;
+            std::vector<std::reference_wrapper<const Test>> tests_passed_;
+            std::vector<std::reference_wrapper<const Test>> tests_failed_;
+            std::vector<std::reference_wrapper<const Test>> tests_skipped_;
+            std::vector<std::reference_wrapper<const Test>> tests_with_error_;
+
         };
     }
 
@@ -652,28 +657,28 @@ namespace H2OFastTests {
 
             ColoredPrintf(COLOR_GREEN, "\tPASSED: %d/%d\n", registry_manager.getPassedCount(), registry_manager.getAllTestsCount());
             if (verbose) {
-                for (const auto test : registry_manager.getPassedTests()) {
-                    ColoredPrintf(COLOR_GREEN, "\t\t[%s] [%f ms]\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count());
+                for (const auto& test : registry_manager.getPassedTests()) {
+                    ColoredPrintf(COLOR_GREEN, "\t\t[%s] [%f ms]\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count());
                 }
             }
 
             ColoredPrintf(COLOR_RED, "\tFAILED: %d/%d\n", registry_manager.getFailedCount(), registry_manager.getAllTestsCount());
             // Always print failed tests
-            for (const auto test : registry_manager.getFailedTests()) {
-                ColoredPrintf(COLOR_RED, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count(), test->getFailureReason().c_str());
+            for (const auto& test : registry_manager.getFailedTests()) {
+                ColoredPrintf(COLOR_RED, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getFailureReason().c_str());
             }
 
             ColoredPrintf(COLOR_YELLOW, "\tSKIPPED: %d/%d\n", registry_manager.getSkippedCount(), registry_manager.getAllTestsCount());
             if (verbose) {
-                for (const auto test : registry_manager.getSkippedTests()) {
-                    ColoredPrintf(COLOR_YELLOW, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count(), test->getSkippedReason().c_str());
+                for (const auto& test : registry_manager.getSkippedTests()) {
+                    ColoredPrintf(COLOR_YELLOW, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getSkippedReason().c_str());
                 }
             }
 
             ColoredPrintf(COLOR_PURPLE, "\tERRORS: %d/%d\n", registry_manager.getWithErrorCount(), registry_manager.getAllTestsCount());
             // Always print error tests
-            for (const auto test : registry_manager.getWithErrorTests()) {
-                ColoredPrintf(COLOR_PURPLE, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test->getLabel(verbose).c_str(), test->getExecTimeMs().count(), test->getError().c_str());
+            for (const auto& test : registry_manager.getWithErrorTests()) {
+                ColoredPrintf(COLOR_PURPLE, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getError().c_str());
             }
         }
     };
@@ -713,8 +718,8 @@ namespace H2OFastTests {
     H2OFastTests::RegistryTraversal_ConsoleIO<ScenarioName>(ScenarioName ## _registry_manager).print(verbose)
 
 #define line_info() \
-    H2OFastTests::line_info_t(__FILE__, "", __LINE__)
+    H2OFastTests::LineInfo(__FILE__, "", __LINE__)
 #define line_info_f() \
-    H2OFastTests::line_info_t(__FILE__, __FUNCTION__, __LINE__)
+    H2OFastTests::LineInfo(__FILE__, __FUNCTION__, __LINE__)
 
 #endif
