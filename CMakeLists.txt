@@ -44,5 +44,5 @@ add_subdirectory(tests)
 # add the install targets
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests.hpp
          DESTINATION H2OFastTests)
-install (FILES ${PROJECT_BINARY_DIR}/inc/H2OFastTests_config.hpp
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests_config.hpp
          DESTINATION H2OFastTests)
