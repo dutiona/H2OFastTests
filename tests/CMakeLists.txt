@@ -5,13 +5,12 @@ set(
 )
 
 set(
-	GLOB_RECURSE
 	source_files_source
 	src/H2OFastTests_Tests.cpp
 )
 
 include_directories(
-	inc/
+	../inc/
 	$(CMAKE_SOURCE_DIR)
 )
 

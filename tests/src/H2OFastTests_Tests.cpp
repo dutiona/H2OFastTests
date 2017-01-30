@@ -8,7 +8,7 @@
 *  See https://github.com/dutiona/H2OFastTests for documentation.
 */
 
-#include "H2OFastTests.h"
+#include "H2OFastTests.hpp"
 
 #include <iostream>
 #include <limits>
