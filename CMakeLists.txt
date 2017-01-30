@@ -4,23 +4,7 @@ cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 set_property(GLOBAL PROPERTY CXX_STANDARD 11)
 set_property(GLOBAL PROPERTY CXX_STANDARD_REQUIRED ON)
 
-if(UNIX)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=gnu++0x")
-endif()
-
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;MinSizeRel;RelWithDebInfo")
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 project (H2OFastTests)
-
-# The version number.
-set (H2OFastTests_VERSION_MAJOR 2)
-set (H2OFastTests_VERSION_MINOR 0)
- 
-configure_file (
-  "${PROJECT_SOURCE_DIR}/config/H2OFastTests_config.h.in"
-  "${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h"
-  )
 
 # Activer dossiers dans Visual
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -37,22 +21,20 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX")
 
-file(
-	GLOB_RECURSE
+set(
 	source_files
-	${PROJECT_BINARY_DIR}/config/*
-	inc/*
+	inc/H2OFastTests.hpp
+    inc/H2OFastTests_config.hpp
 )
 
 source_group(
 	"Headers"
 	FILES
-	inc/H2OFastTests.h
-	${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h
+	inc/H2OFastTests.hpp
+    inc/H2OFastTests_config.hpp
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
-include_directories(${PROJECT_BINARY_DIR}/config)
 
 add_library(H2OFastTests STATIC ${source_files})
 set_target_properties(H2OFastTests PROPERTIES LINKER_LANGUAGE CXX)
@@ -60,7 +42,7 @@ set_target_properties(H2OFastTests PROPERTIES LINKER_LANGUAGE CXX)
 add_subdirectory(tests)
 
 # add the install targets
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests.h
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests.hpp
          DESTINATION H2OFastTests)
-install (FILES ${PROJECT_BINARY_DIR}/config/H2OFastTests_config.h
+install (FILES ${PROJECT_BINARY_DIR}/inc/H2OFastTests_config.hpp
          DESTINATION H2OFastTests)

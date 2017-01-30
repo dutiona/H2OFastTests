@@ -28,7 +28,7 @@
 #include <typeinfo>
 #include <typeindex>
 
-#include "H2OFastTests_config.h"
+#include "H2OFastTests_config.hpp"
 
 namespace H2OFastTests {
     // Implementation details

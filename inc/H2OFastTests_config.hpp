@@ -13,9 +13,6 @@
 #ifndef H2OFASTTESTS_CONFIG_H
 #define H2OFASTTESTS_CONFIG_H
 
-#define H2OFastTests_VERSION_MAJOR @H2OFastTests_VERSION_MAJOR@
-#define H2OFastTests_VERSION_MINOR @H2OFastTests_VERSION_MAJOR@
-
 #include <iostream>
 #include <string>
 

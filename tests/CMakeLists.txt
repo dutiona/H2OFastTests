@@ -1,13 +1,13 @@
-file(
-	GLOB_RECURSE
+set(
 	source_files_headers
-	inc/*
+	../inc/H2OFastTests.hpp
+    ../inc/H2OFastTests_config.hpp
 )
 
-file(
+set(
 	GLOB_RECURSE
 	source_files_source
-	src/*
+	src/H2OFastTests_Tests.cpp
 )
 
 include_directories(
