@@ -117,7 +117,7 @@ namespace H2OFastTests {
         template<>
         struct additionalInfos<true, false> {
            template<class ValueTypeL, class ValueTypeR>
-           static std::string get(FailureType failure_type, ValueTypeL reached, ValueTypeR expected, const std::string& exception_name) noexcept {
+           static std::string get(FailureType failure_type, ValueTypeL reached, ValueTypeR expected, const std::string&) noexcept {
               std::ostringstream oss;
               oss << "\t\t\t[REACHED] " << reached << std::endl;
               switch (failure_type) {
@@ -142,7 +142,7 @@ namespace H2OFastTests {
         template<>
         struct additionalInfos<false, false> {
            template<class ValueTypeL, class ValueTypeR>
-           static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string& exception_name) noexcept {
+           static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string&) noexcept {
               std::ostringstream oss;
               switch (failure_type) {
                  case FailureType::equal: {
@@ -303,7 +303,7 @@ namespace H2OFastTests {
             template<class T>
             EmptyExpression isNotSameAs(const T& actual,
                 const std::string& message = {}, const LineInfo& lineInfo = {}) {
-                FailureTest(!(&expr_ == &actual), FailureType::different, message, lineInfo);
+                FailureTest(!(&expr_ == &actual), &expr_, &actual, FailureType::different, message, lineInfo);
                 return{};
             }
 
@@ -391,7 +391,7 @@ namespace H2OFastTests {
             template<class T>
             EmptyExpression isNotEqualTo(const T& notExpected,
                 const std::string& message = {}, const LineInfo& lineInfo = {}) {
-                FailureTest(!(notExpected == expr_), expr_, expected, FailureType::different, message, lineInfo);
+                FailureTest(!(notExpected == expr_), expr_, notExpected, FailureType::different, message, lineInfo);
                 return{};
             }
 
@@ -399,7 +399,7 @@ namespace H2OFastTests {
             EmptyExpression isNotEqualTo(double notExpected, double tolerance,
                 const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 double diff = notExpected - expr_;
-                FailureTest(std::abs(diff) > std::abs(tolerance), expr_, expected, FailureType::different, message, lineInfo);
+                FailureTest(std::abs(diff) > std::abs(tolerance), expr_, notExpected, FailureType::different, message, lineInfo);
                 return{};
             }
 
@@ -407,7 +407,7 @@ namespace H2OFastTests {
             EmptyExpression isNotEqualTo(float notExpected, float expr_, float tolerance,
                 const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 float diff = notExpected - expr_;
-                FailureTest(std::abs(diff) > std::abs(tolerance), expr_, expected, FailureType::different, message, lineInfo);
+                FailureTest(std::abs(diff) > std::abs(tolerance), expr_, notExpected, FailureType::different, message, lineInfo);
                 return{};
             }
 
@@ -420,7 +420,7 @@ namespace H2OFastTests {
                     std::transform(notExpected_str.begin(), notExpected_str.end(), notExpected_str.begin(), ::tolower);
                     std::transform(expr_str.begin(), expr_str.end(), expr_str.begin(), ::tolower);
                 }
-                FailureTest(notExpected_str != expr_str, expr_, expected, FailureType::different, message, lineInfo);
+                FailureTest(notExpected_str != expr_str, expr_str, notExpected_str, FailureType::different, message, lineInfo);
                 return{};
             }
 
@@ -431,7 +431,7 @@ namespace H2OFastTests {
                     std::transform(notExpected.begin(), notExpected.end(), notExpected.begin(), ::tolower);
                     std::transform(expr_.begin(), expr_.end(), expr_.begin(), ::tolower);
                 }
-                FailureTest(notExpected != expr_, expr_, expected, FailureType::different, message, lineInfo);
+                FailureTest(notExpected != expr_, expr_, notExpected, FailureType::different, message, lineInfo);
                 return{};
             }
 
@@ -703,19 +703,19 @@ namespace H2OFastTests {
                     exec_time_ms_accumulator_ += test->getExecTimeMs();
                     notify(TestInfo{ *test });
                     switch (test->getStatus()) {
-					case Test::Status::PASSED:
-                        tests_passed_.push_back(std::cref(*test));
-                        break;
-                    case Test::Status::FAILED:
-                        tests_failed_.push_back(std::cref(*test));
-                        break;
-                    case Test::Status::SKIPPED:
-                        tests_skipped_.push_back(std::cref(*test));
-                        break;
-                    case Test::Status::ERROR:
-                        tests_with_error_.push_back(std::cref(*test));
-                        break;
-                    default: break;
+                       case Test::Status::PASSED:
+                          tests_passed_.push_back(std::cref(*test));
+                          break;
+                       case Test::Status::FAILED:
+                          tests_failed_.push_back(std::cref(*test));
+                          break;
+                       case Test::Status::SKIPPED:
+                          tests_skipped_.push_back(std::cref(*test));
+                          break;
+                       case Test::Status::ERROR:
+                          tests_with_error_.push_back(std::cref(*test));
+                          break;
+                       default: break;
                     }
                 }
                 run_ = true;
@@ -795,13 +795,13 @@ namespace H2OFastTests {
         void print(bool verbose) const {
             auto& registry_manager = this->getRegistryManager();
             const auto test_name = std::string{ H2OFastTests::detail::type_helper<ScenarioName>::name() };
-            ColoredPrintf(COLOR_CYAN, "UNIT TEST SUMMARY [%s] [%f ms] : \n", test_name.substr(test_name.find(' ') + 1).c_str(), registry_manager.getAllTestsExecTimeMs().count());
+            ColoredPrintf(COLOR_CYAN, "UNIT TEST SUMMARY [%s] [%.6f ms] : \n", test_name.substr(test_name.find(' ') + 1).c_str(), registry_manager.getAllTestsExecTimeMs().count());
 
             if (registry_manager.getPassedCount() > 0) {
                ColoredPrintf(COLOR_GREEN, "\tPASSED: %d/%d\n", registry_manager.getPassedCount(), registry_manager.getAllTestsCount());
                if (verbose) {
                   for (const auto& test : registry_manager.getPassedTests()) {
-                     ColoredPrintf(COLOR_GREEN, "\t\t[%s] [%f ms]\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count());
+                     ColoredPrintf(COLOR_GREEN, "\t\t[%s] [%.6f ms]\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count());
                   }
                }
             }
@@ -810,7 +810,7 @@ namespace H2OFastTests {
                ColoredPrintf(COLOR_RED, "\tFAILED: %d/%d\n", registry_manager.getFailedCount(), registry_manager.getAllTestsCount());
                // Always print failed tests
                for (const auto& test : registry_manager.getFailedTests()) {
-                  ColoredPrintf(COLOR_RED, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getFailureReason().c_str());
+                  ColoredPrintf(COLOR_RED, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getFailureReason().c_str());
                }
             }
 
@@ -818,7 +818,7 @@ namespace H2OFastTests {
                ColoredPrintf(COLOR_YELLOW, "\tSKIPPED: %d/%d\n", registry_manager.getSkippedCount(), registry_manager.getAllTestsCount());
                if (verbose) {
                   for (const auto& test : registry_manager.getSkippedTests()) {
-                     ColoredPrintf(COLOR_YELLOW, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getSkippedReason().c_str());
+                     ColoredPrintf(COLOR_YELLOW, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getSkippedReason().c_str());
                   }
                }
             }
@@ -827,7 +827,7 @@ namespace H2OFastTests {
                ColoredPrintf(COLOR_PURPLE, "\tERRORS: %d/%d\n", registry_manager.getWithErrorCount(), registry_manager.getAllTestsCount());
                // Always print error tests
                for (const auto& test : registry_manager.getWithErrorTests()) {
-                  ColoredPrintf(COLOR_PURPLE, "\t\t[%s] [%f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getError().c_str());
+                  ColoredPrintf(COLOR_PURPLE, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getError().c_str());
                }
             }
         }

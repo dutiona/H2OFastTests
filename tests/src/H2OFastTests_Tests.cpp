@@ -135,7 +135,7 @@ register_scenario(H2OFastTests_Tests)
 
 int main(int /*argc*/, char** /*argv*/) {
     run_scenario(H2OFastTests_Tests);
-    print_result(H2OFastTests_Tests, true);
+    print_result_verbose(H2OFastTests_Tests);
 
     std::cout << "Press enter to continue...";
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
