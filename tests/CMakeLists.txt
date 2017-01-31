@@ -1,7 +1,7 @@
 set(
 	source_files_headers
-	../inc/H2OFastTests.hpp
-    ../inc/H2OFastTests_config.hpp
+	../include/H2OFastTests.hpp
+    ../include/H2OFastTests_config.hpp
 )
 
 set(
@@ -10,7 +10,7 @@ set(
 )
 
 include_directories(
-	../inc/
+	../include/
 	$(CMAKE_SOURCE_DIR)
 )
 

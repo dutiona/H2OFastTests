@@ -23,18 +23,18 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX")
 
 set(
 	source_files
-	inc/H2OFastTests.hpp
-    inc/H2OFastTests_config.hpp
+	include/H2OFastTests.hpp
+    include/H2OFastTests_config.hpp
 )
 
 source_group(
 	"Headers"
 	FILES
-	inc/H2OFastTests.hpp
-    inc/H2OFastTests_config.hpp
+	include/H2OFastTests.hpp
+    include/H2OFastTests_config.hpp
 )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_library(H2OFastTests STATIC ${source_files})
 set_target_properties(H2OFastTests PROPERTIES LINKER_LANGUAGE CXX)
@@ -42,7 +42,7 @@ set_target_properties(H2OFastTests PROPERTIES LINKER_LANGUAGE CXX)
 add_subdirectory(tests)
 
 # add the install targets
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests.hpp
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/H2OFastTests.hpp
          DESTINATION H2OFastTests)
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/inc/H2OFastTests_config.hpp
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/H2OFastTests_config.hpp
          DESTINATION H2OFastTests)
