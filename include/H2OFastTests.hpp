@@ -671,7 +671,9 @@ namespace H2OFastTests {
         class RegistryManager : public IRegistryObservable {
         public:
 
-            RegistryManager(std::function<void(void)> feeder)
+            using FeederFunctor = std::function<void(void)>;
+
+            RegistryManager(FeederFunctor feeder)
                 : run_(false), exec_time_ms_accumulator_(Duration{ 0 }) {
                 feeder();
             }
@@ -861,7 +863,7 @@ namespace H2OFastTests {
 //Helper macros to use the unit test suit
 #define register_scenario(ScenarioName) \
     struct ScenarioName : H2OFastTests::RegistryManager<ScenarioName> { \
-        ScenarioName(std::function<void(void)> feeder); \
+        ScenarioName(H2OFastTests::RegistryManager<ScenarioName>::FeederFunctor feeder); \
         virtual void describe(); \
     }; \
     static ScenarioName ScenarioName ## _registry_manager{ []() { \
@@ -869,7 +871,7 @@ namespace H2OFastTests {
         H2OFastTests::detail::get_registry().getAllSetUps().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), [](){}); \
         H2OFastTests::detail::get_registry().getAllTearDowns().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), [](){}); \
     } }; \
-    ScenarioName::ScenarioName(std::function<void(void)> feeder) \
+    ScenarioName::ScenarioName(H2OFastTests::RegistryManager<ScenarioName>::FeederFunctor feeder) \
         : RegistryManager<ScenarioName>{ feeder } { \
         describe(); \
     } \
