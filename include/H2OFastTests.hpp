@@ -163,29 +163,8 @@ namespace H2OFastTests {
             }
         };
 
-        template<>
-        struct additionalInfos<false, true> {
-            template<class ValueTypeL, class ValueTypeR>
-            static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string& exception_name) noexcept {
-                std::ostringstream oss;
-                switch (failure_type) {
-                case FailureType::exception: {
-                    oss << "\t\t[EXPECTED Exception] " << exception_name << std::endl;
-                    break;
-                }
-                case FailureType::equal:
-                case FailureType::different:
-                default: {
-                    oss << "\t\t\t[ERROR] " << std::endl;
-                    break;
-                }
-                }
-                return oss.str();
-            }
-        };
-
-        template<>
-        struct additionalInfos<true, true> {
+        template<bool Streamable>
+        struct additionalInfos<Streamable, true> {
             template<class ValueTypeL, class ValueTypeR>
             static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string& exception_name) noexcept {
                 std::ostringstream oss;
