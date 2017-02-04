@@ -35,6 +35,14 @@ register_scenario(H2OFastTests_Tests)
 {
     auto epsf_v = 1e-5f;
     auto epsd_v = 1e-5;
+    
+    set_up([]() {
+        std::cout << "Setup" << std::endl;
+    });
+
+    tear_down([]() {
+        std::cout << "Teardown" << std::endl;
+    });
 
     skip_test("Test skip", "Assert::AreEqual(double, tolerance = 1e-5)", [epsd_v]() {
         AssertThat(0.).isEqualTo(epsd_v, epsd_v, "Expect 0. == 1e-5");

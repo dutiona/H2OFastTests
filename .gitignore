@@ -5,6 +5,9 @@
 *.suo
 *.user
 *.sln.docstates
+.vs
+CMakeSettings.json
+
 
 # Build results
 [Dd]ebug/
@@ -18,6 +21,7 @@ bld/
 [Oo]bj/
 [Vv][Ss]2013*/
 [Vv][Ss]2015*/
+[Vv][Ss]2017*/
 Xcode/
 .DS_Store
 # Roslyn cache directories

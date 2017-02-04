@@ -45,12 +45,12 @@ namespace H2OFastTests {
 
         template<class Type>
         struct type_helper {
-           using type = Type;
-           static bool before(const std::type_info& rhs) { return typeid(Type).before(rhs); }
-           static const char* raw_name() { return typeid(Type).raw_name(); }
-           static const char* name() { return typeid(Type).name(); }
-           static size_t hash_code() { return typeid(Type).hash_code(); }
-           static std::type_index type_index() { return std::type_index(typeid(Type)); }
+            using type = Type;
+            static bool before(const std::type_info& rhs) { return typeid(Type).before(rhs); }
+            static const char* raw_name() { return typeid(Type).raw_name(); }
+            static const char* name() { return typeid(Type).name(); }
+            static size_t hash_code() { return typeid(Type).hash_code(); }
+            static std::type_index type_index() { return std::type_index(typeid(Type)); }
         };
 
         // Line info struct
@@ -76,7 +76,7 @@ namespace H2OFastTests {
             // Basic display
             friend std::ostream& operator<<(std::ostream& os, const LineInfo& lineInfo) {
                 if (lineInfo.isInit())
-                os << lineInfo.file_ << ":" << lineInfo.line_ << " " << lineInfo.func_;
+                    os << lineInfo.file_ << ":" << lineInfo.line_ << " " << lineInfo.func_;
                 return os;
             }
 
@@ -92,117 +92,117 @@ namespace H2OFastTests {
         // Used by internal test runner and assert tool to communicate over the test
         template<class S, class T>
         class is_streamable {
-           template<class SS, class TT>
-           static auto test(int) -> decltype(std::declval<SS&>() << std::declval<TT>(), std::true_type());
+            template<class SS, class TT>
+            static auto test(int) -> decltype(std::declval<SS&>() << std::declval<TT>(), std::true_type());
 
-           template<class, class>
-           static auto test(...) -> std::false_type;
+            template<class, class>
+            static auto test(...)->std::false_type;
 
         public:
-           static const bool value = decltype(test<S, T>(0))::value;
+            static const bool value = decltype(test<S, T>(0))::value;
         };
 
         enum class FailureType {
-           equal,
-           different,
-           exception
+            equal,
+            different,
+            exception
         };
 
         template<bool Streamable, bool Exception>
         struct additionalInfos {
-           template<class ValueTypeL, class ValueTypeR>
-           static std::string get(FailureType failure_type, ValueTypeL reached, ValueTypeR expected, const std::string& exception_name);
+            template<class ValueTypeL, class ValueTypeR>
+            static std::string get(FailureType failure_type, ValueTypeL reached, ValueTypeR expected, const std::string& exception_name);
         };
 
         template<>
         struct additionalInfos<true, false> {
-           template<class ValueTypeL, class ValueTypeR>
-           static std::string get(FailureType failure_type, ValueTypeL reached, ValueTypeR expected, const std::string&) noexcept {
-              std::ostringstream oss;
-              oss << "\t\t\t[REACHED] " << reached << std::endl;
-              switch (failure_type) {
-                 case FailureType::equal: {
+            template<class ValueTypeL, class ValueTypeR>
+            static std::string get(FailureType failure_type, ValueTypeL reached, ValueTypeR expected, const std::string&) noexcept {
+                std::ostringstream oss;
+                oss << "\t\t\t[REACHED] " << reached << std::endl;
+                switch (failure_type) {
+                case FailureType::equal: {
                     oss << "\t\t\t[EXPECTED EQUAL TO] " << expected << std::endl;
                     break;
-                 }
-                 case FailureType::different: {
+                }
+                case FailureType::different: {
                     oss << "\t\t\t[EXPECTED DIFFERENT FROM] " << expected << std::endl;
                     break;
-                 }
-                 case FailureType::exception:
-                 default: {
+                }
+                case FailureType::exception:
+                default: {
                     oss << "\t\t\t[ERROR] " << std::endl;
                     break;
-                 }
-              }
-              return oss.str();
-           }
+                }
+                }
+                return oss.str();
+            }
         };
 
         template<>
         struct additionalInfos<false, false> {
-           template<class ValueTypeL, class ValueTypeR>
-           static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string&) noexcept {
-              std::ostringstream oss;
-              switch (failure_type) {
-                 case FailureType::equal: {
+            template<class ValueTypeL, class ValueTypeR>
+            static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string&) noexcept {
+                std::ostringstream oss;
+                switch (failure_type) {
+                case FailureType::equal: {
                     oss << "\t\t\t[REACHED] is different from [EXPECTED]. Expected [EQUAL TO]" << std::endl;
                     break;
-                 }
-                 case FailureType::different: {
+                }
+                case FailureType::different: {
                     oss << "\t\t\t[REACHED] is equal to [EXPECTED]. Expected [DIFFERENT FROM]" << std::endl;
                     break;
-                 }
-                 case FailureType::exception:
-                 default: {
+                }
+                case FailureType::exception:
+                default: {
                     oss << "\t\t\t[ERROR] " << std::endl;
                     break;
-                 }
-              }
-              return oss.str();
-           }
+                }
+                }
+                return oss.str();
+            }
         };
 
         template<>
         struct additionalInfos<false, true> {
-           template<class ValueTypeL, class ValueTypeR>
-           static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string& exception_name) noexcept {
-              std::ostringstream oss;
-              switch (failure_type) {
-                 case FailureType::exception: {
+            template<class ValueTypeL, class ValueTypeR>
+            static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string& exception_name) noexcept {
+                std::ostringstream oss;
+                switch (failure_type) {
+                case FailureType::exception: {
                     oss << "\t\t[EXPECTED Exception] " << exception_name << std::endl;
                     break;
-                 }
-                 case FailureType::equal:
-                 case FailureType::different:
-                 default: {
+                }
+                case FailureType::equal:
+                case FailureType::different:
+                default: {
                     oss << "\t\t\t[ERROR] " << std::endl;
                     break;
-                 }
-              }
-              return oss.str();
-           }
+                }
+                }
+                return oss.str();
+            }
         };
 
         template<>
         struct additionalInfos<true, true> {
-           template<class ValueTypeL, class ValueTypeR>
-           static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string& exception_name) noexcept {
-              std::ostringstream oss;
-              switch (failure_type) {
-                 case FailureType::exception: {
+            template<class ValueTypeL, class ValueTypeR>
+            static std::string get(FailureType failure_type, ValueTypeL, ValueTypeR, const std::string& exception_name) noexcept {
+                std::ostringstream oss;
+                switch (failure_type) {
+                case FailureType::exception: {
                     oss << "\t\t[EXPECTED Exception] " << exception_name << std::endl;
                     break;
-                 }
-                 case FailureType::equal:
-                 case FailureType::different:
-                 default: {
+                }
+                case FailureType::equal:
+                case FailureType::different:
+                default: {
                     oss << "\t\t\t[ERROR] " << std::endl;
                     break;
-                 }
-              }
-              return oss.str();
-           }
+                }
+                }
+                return oss.str();
+            }
         };
 
         class GenericTestFailure : public std::exception {};
@@ -216,12 +216,12 @@ namespace H2OFastTests {
             {}
 
             virtual const char * what() const noexcept override {
-               message_ += '\n' + additionalInfos<
-                  is_streamable<std::stringstream, ValueTypeL>::value &&
-                  is_streamable<std::stringstream, ValueTypeR>::value
-                  , !std::is_same_v<void, ExceptionType>
-               >::get(failure_type_, reached_, expected_, type_helper<ExceptionType>::name());
-               return message_.c_str();
+                message_ += '\n' + additionalInfos<
+                    is_streamable<std::stringstream, ValueTypeL>::value &&
+                    is_streamable<std::stringstream, ValueTypeR>::value
+                    , !std::is_same_v<void, ExceptionType>
+                >::get(failure_type_, reached_, expected_, type_helper<ExceptionType>::name());
+                return message_.c_str();
             }
 
             TestFailure& operator=(const TestFailure&) = delete;
@@ -237,10 +237,10 @@ namespace H2OFastTests {
 
         // Internal impl for processing an assert and raise the TestFailure Exception
         template<class ValueTypeL, class ValueTypeR, class ExceptionType = void,
-           typename = std::enable_if_t<
-               std::is_convertible_v<ValueTypeL, ValueTypeR> ||
-               std::is_convertible_v<ValueTypeR, ValueTypeL>>>
-        void FailureTest(bool condition, ValueTypeL reached, ValueTypeR expected, FailureType failure_type, const std::string& message, const LineInfo& lineInfo) {
+            typename = std::enable_if_t<
+            std::is_convertible_v<ValueTypeL, ValueTypeR> ||
+            std::is_convertible_v<ValueTypeR, ValueTypeL>>>
+            void FailureTest(bool condition, ValueTypeL reached, ValueTypeR expected, FailureType failure_type, const std::string& message, const LineInfo& lineInfo) {
             std::ostringstream oss;
             if (!condition) {
                 if (lineInfo.isInit()) {
@@ -249,7 +249,7 @@ namespace H2OFastTests {
                 else {
                     oss << message;
                 }
-                
+
                 throw TestFailure<ValueTypeL, ValueTypeR, ExceptionType>(oss.str(), reached, expected, failure_type);
             }
         }
@@ -369,10 +369,10 @@ namespace H2OFastTests {
                 auto expected_str = std::string{ expected };
                 auto expr_str = std::string{ expr_ };
                 if (ignoreCase) {
-                    std::transform(expected_str.begin(), expected_str.end(), expected_str.begin(), ::tolower);
-                    std::transform(expr_str.begin(), expr_str.end(), expr_str.begin(), ::tolower);
+                    tolower_internal(expected_str);
+                    tolower_internal(expr_str);
                 }
-                FailureTest(expected_str == expr_str, expr_, expected, FailureType::equal, message, lineInfo);
+                FailureTest(expected_str == expr_str, expr_str, expected_str, FailureType::equal, message, lineInfo);
                 return{};
             }
 
@@ -380,8 +380,8 @@ namespace H2OFastTests {
             EmptyExpression isEqualTo(std::string expected, bool ignoreCase,
                 const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 if (ignoreCase) {
-                    std::transform(expected.begin(), expected.end(), expected.begin(), ::tolower);
-                    std::transform(expr_.begin(), expr_.end(), expr_.begin(), ::tolower);
+                    tolower_internal(expected);
+                    tolower_internal(expr_);
                 }
                 FailureTest(expected == expr_, expr_, expected, FailureType::equal, message, lineInfo);
                 return{};
@@ -417,8 +417,8 @@ namespace H2OFastTests {
                 auto notExpected_str = std::string{ notExpected };
                 auto expr_str = std::string{ expr_ };
                 if (ignoreCase) {
-                    std::transform(notExpected_str.begin(), notExpected_str.end(), notExpected_str.begin(), ::tolower);
-                    std::transform(expr_str.begin(), expr_str.end(), expr_str.begin(), ::tolower);
+                    tolower_internal(notExpected_str);
+                    tolower_internal(expr_str);
                 }
                 FailureTest(notExpected_str != expr_str, expr_str, notExpected_str, FailureType::different, message, lineInfo);
                 return{};
@@ -428,22 +428,29 @@ namespace H2OFastTests {
             EmptyExpression isNotEqualTo(std::string notExpected, bool ignoreCase,
                 const std::string& message = {}, const LineInfo& lineInfo = {}) {
                 if (ignoreCase) {
-                    std::transform(notExpected.begin(), notExpected.end(), notExpected.begin(), ::tolower);
-                    std::transform(expr_.begin(), expr_.end(), expr_.begin(), ::tolower);
+                    tolower_internal(notExpected);
+                    tolower_internal(expr_);
                 }
                 FailureTest(notExpected != expr_, expr_, notExpected, FailureType::different, message, lineInfo);
                 return{};
             }
 
         private:
-            
-           // Force the test case result to be fail:
-           template<class ExpectedException>
-           EmptyExpression fail_exception(const std::string& message = {}, const LineInfo& lineInfo = {}) {
-              FailureTest<bool, bool, ExpectedException>(false, false, false, FailureType::exception, message, lineInfo);
-              return{};
-           }
-            
+
+            // Lower case function
+            void tolower_internal(std::string& s) {
+                std::transform(s.begin(), s.end(), s.begin(), [](char c) {
+                    return static_cast<char>(::tolower(static_cast<int>(c)));
+                });
+            }
+
+            // Force the test case result to be fail:
+            template<class ExpectedException>
+            EmptyExpression fail_exception(const std::string& message = {}, const LineInfo& lineInfo = {}) {
+                FailureTest<bool, bool, ExpectedException>(false, false, false, FailureType::exception, message, lineInfo);
+                return{};
+            }
+
             Expr expr_; // Current value stored
         };
 
@@ -454,6 +461,8 @@ namespace H2OFastTests {
         }
 
         using TestFunctor = std::function<void(void)>;
+        using SetUpFunctor = std::function<void(void)>;
+        using TearDownFunctor = std::function<void(void)>;
         using Duration = std::chrono::duration<double, std::milli>; // ms
 
         // Standard class discribing a test
@@ -504,9 +513,9 @@ namespace H2OFastTests {
                 return std::move(*this);
             }
 
-			Test(std::reference_wrapper<Test> test)
-				: Test(std::move(test.get()))
-			{}
+            Test(std::reference_wrapper<Test> test)
+                : Test(std::move(test.get()))
+            {}
 
             // Virtual destructor impl
             virtual ~Test() {}
@@ -521,7 +530,12 @@ namespace H2OFastTests {
 
         protected:
 
-            void run() { run_private(); } // Called by RegistryManager
+            // Called by RegistryManager
+            void run(const SetUpFunctor& setup, const TearDownFunctor& teardown) {
+                setup();
+                run_private();
+                teardown();
+            }
 
             // Run the test and capture and set the state
             virtual void run_private() {
@@ -568,7 +582,7 @@ namespace H2OFastTests {
         };
 
         std::ostream& operator<<(std::ostream& os, Test::Status status) {
-            switch (status)    {
+            switch (status) {
             case Test::Status::PASSED:
                 os << "PASSED";
                 break;
@@ -654,68 +668,99 @@ namespace H2OFastTests {
 
         // Global static registry storage object
         using TestList = std::vector<std::unique_ptr<Test>>;
-        using ResgistryStorage = std::map<std::type_index, TestList>;
+        using TestStorage = std::map<std::type_index, TestList>;
+        using SetUpStorage = std::map<std::type_index, SetUpFunctor>;
+        using TearDownStorage = std::map<std::type_index, TearDownFunctor>;
 
-        ResgistryStorage& get_registry() {
-            static ResgistryStorage registry;
+        class RegistryStorage {
+        public:
+
+            TestList& getTests(std::type_index index) { return getAllTests()[index]; }
+            SetUpFunctor& getSetUp(std::type_index index) { return getAllSetUps()[index]; }
+            TearDownFunctor& getTearDown(std::type_index index) { return getAllTearDowns()[index]; }
+
+            TestStorage& getAllTests() { return tests_; }
+            SetUpStorage& getAllSetUps() { return setups_; }
+            SetUpStorage& getAllTearDowns() { return teardowns_; }
+
+        private:
+
+            TestStorage tests_;
+            SetUpStorage setups_;
+            TearDownStorage teardowns_;
+
+        };
+
+        RegistryStorage& get_registry() {
+            static RegistryStorage registry;
             return registry;
         }
 
         // Manage a registry in a static context
         template<class ScenarioName>
-        class RegistryManager : public IRegistryObservable{
+        class RegistryManager : public IRegistryObservable {
         public:
 
-            RegistryManager(std::function<bool(void)> feeder)
+            RegistryManager(std::function<void(void)> feeder)
                 : run_(false), exec_time_ms_accumulator_(Duration{ 0 }) {
                 feeder();
             }
 
             //Recursive variadic to iterate over the test pack
             void add_test(Test&& test) {
-                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(test));
+                get_registry().getTests(type_helper<ScenarioName>::type_index()).push_back(std::move(test));
             }
 
             void add_test(TestFunctor&& func) {
-                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(std::move(func))));
+                get_registry().getTests(type_helper<ScenarioName>::type_index()).push_back(std::move(make_test(std::move(func))));
             }
 
             void add_test(const std::string& label, TestFunctor&& func) {
-                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_test(label, std::move(func))));
+                get_registry().getTests(type_helper<ScenarioName>::type_index()).push_back(std::move(make_test(label, std::move(func))));
             }
             void skip_test(TestFunctor&& func) {
-                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(std::move(func))));
+                get_registry().getTests(type_helper<ScenarioName>::type_index()).push_back(std::move(make_skipped_test(std::move(func))));
             }
 
             void skip_test(const std::string& label, TestFunctor&& func) {
-                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(label, std::move(func))));
+                get_registry().getTests(type_helper<ScenarioName>::type_index()).push_back(std::move(make_skipped_test(label, std::move(func))));
             }
 
             void skip_test(const std::string& reason, const std::string& label, TestFunctor&& func) {
-                get_registry()[type_helper<ScenarioName>::type_index()].push_back(std::move(make_skipped_test(reason, label, std::move(func))));
+                get_registry().getTests(type_helper<ScenarioName>::type_index()).push_back(std::move(make_skipped_test(reason, label, std::move(func))));
+            }
+
+            void set_up(SetUpFunctor&& func) {
+                get_registry().getSetUp(type_helper<ScenarioName>::type_index()) = std::move(func);
+            }
+
+            void tear_down(TearDownFunctor&& func) {
+                get_registry().getTearDown(type_helper<ScenarioName>::type_index()) = std::move(func);
             }
 
             // Run all the tests
             void run_tests() {
-                auto& tests = get_registry()[type_helper<ScenarioName>::type_index()];
+                const auto& setup = get_registry().getSetUp(type_helper<ScenarioName>::type_index());
+                const auto& teardown = get_registry().getTearDown(type_helper<ScenarioName>::type_index());
+                auto& tests = get_registry().getTests(type_helper<ScenarioName>::type_index());
                 for (auto& test : tests) {
-                    test->run();
+                    test->run(setup, teardown);
                     exec_time_ms_accumulator_ += test->getExecTimeMs();
                     notify(TestInfo{ *test });
                     switch (test->getStatus()) {
-                       case Test::Status::PASSED:
-                          tests_passed_.push_back(std::cref(*test));
-                          break;
-                       case Test::Status::FAILED:
-                          tests_failed_.push_back(std::cref(*test));
-                          break;
-                       case Test::Status::SKIPPED:
-                          tests_skipped_.push_back(std::cref(*test));
-                          break;
-                       case Test::Status::ERROR:
-                          tests_with_error_.push_back(std::cref(*test));
-                          break;
-                       default: break;
+                    case Test::Status::PASSED:
+                        tests_passed_.push_back(std::cref(*test));
+                        break;
+                    case Test::Status::FAILED:
+                        tests_failed_.push_back(std::cref(*test));
+                        break;
+                    case Test::Status::SKIPPED:
+                        tests_skipped_.push_back(std::cref(*test));
+                        break;
+                    case Test::Status::ERROR:
+                        tests_with_error_.push_back(std::cref(*test));
+                        break;
+                    default: break;
                     }
                 }
                 run_ = true;
@@ -738,8 +783,8 @@ namespace H2OFastTests {
             size_t getWithErrorCount() const { return run_ ? tests_with_error_.size() : 0; }
             const std::vector<std::reference_wrapper<const Test>>& getWithErrorTests() const { return tests_with_error_; }
 
-            size_t getAllTestsCount() const { return run_ ? get_registry()[type_helper<ScenarioName>::type_index()].size() : 0; }
-            const TestList& getAllTests() const { return get_registry()[type_helper<ScenarioName>::type_index()]; }
+            size_t getAllTestsCount() const { return run_ ? get_registry().getTests(type_helper<ScenarioName>::type_index()).size() : 0; }
+            const TestList& getAllTests() const { return get_registry().getTests(type_helper<ScenarioName>::type_index()); }
             Duration getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : Duration{ 0 }; }
 
         private:
@@ -763,7 +808,7 @@ namespace H2OFastTests {
     // Public accessible types
     using detail::LineInfo;
     using detail::TestInfo;
-    using detail::ResgistryStorage;
+    using detail::RegistryStorage;
     using detail::IRegistryObserver;
     template<class ScenarioName>
     using RegistryManager = detail::RegistryManager<ScenarioName>;
@@ -798,37 +843,37 @@ namespace H2OFastTests {
             ColoredPrintf(COLOR_CYAN, "UNIT TEST SUMMARY [%s] [%.6f ms] : \n", test_name.substr(test_name.find(' ') + 1).c_str(), registry_manager.getAllTestsExecTimeMs().count());
 
             if (registry_manager.getPassedCount() > 0) {
-               ColoredPrintf(COLOR_GREEN, "\tPASSED: %d/%d\n", registry_manager.getPassedCount(), registry_manager.getAllTestsCount());
-               if (verbose) {
-                  for (const auto& test : registry_manager.getPassedTests()) {
-                     ColoredPrintf(COLOR_GREEN, "\t\t[%s] [%.6f ms]\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count());
-                  }
-               }
+                ColoredPrintf(COLOR_GREEN, "\tPASSED: %d/%d\n", registry_manager.getPassedCount(), registry_manager.getAllTestsCount());
+                if (verbose) {
+                    for (const auto& test : registry_manager.getPassedTests()) {
+                        ColoredPrintf(COLOR_GREEN, "\t\t[%s] [%.6f ms]\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count());
+                    }
+                }
             }
 
             if (registry_manager.getFailedCount() > 0) {
-               ColoredPrintf(COLOR_RED, "\tFAILED: %d/%d\n", registry_manager.getFailedCount(), registry_manager.getAllTestsCount());
-               // Always print failed tests
-               for (const auto& test : registry_manager.getFailedTests()) {
-                  ColoredPrintf(COLOR_RED, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getFailureReason().c_str());
-               }
+                ColoredPrintf(COLOR_RED, "\tFAILED: %d/%d\n", registry_manager.getFailedCount(), registry_manager.getAllTestsCount());
+                // Always print failed tests
+                for (const auto& test : registry_manager.getFailedTests()) {
+                    ColoredPrintf(COLOR_RED, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getFailureReason().c_str());
+                }
             }
 
             if (registry_manager.getSkippedCount() > 0) {
-               ColoredPrintf(COLOR_YELLOW, "\tSKIPPED: %d/%d\n", registry_manager.getSkippedCount(), registry_manager.getAllTestsCount());
-               if (verbose) {
-                  for (const auto& test : registry_manager.getSkippedTests()) {
-                     ColoredPrintf(COLOR_YELLOW, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getSkippedReason().c_str());
-                  }
-               }
+                ColoredPrintf(COLOR_YELLOW, "\tSKIPPED: %d/%d\n", registry_manager.getSkippedCount(), registry_manager.getAllTestsCount());
+                if (verbose) {
+                    for (const auto& test : registry_manager.getSkippedTests()) {
+                        ColoredPrintf(COLOR_YELLOW, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getSkippedReason().c_str());
+                    }
+                }
             }
 
             if (registry_manager.getWithErrorCount() > 0) {
-               ColoredPrintf(COLOR_PURPLE, "\tERRORS: %d/%d\n", registry_manager.getWithErrorCount(), registry_manager.getAllTestsCount());
-               // Always print error tests
-               for (const auto& test : registry_manager.getWithErrorTests()) {
-                  ColoredPrintf(COLOR_PURPLE, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getError().c_str());
-               }
+                ColoredPrintf(COLOR_PURPLE, "\tERRORS: %d/%d\n", registry_manager.getWithErrorCount(), registry_manager.getAllTestsCount());
+                // Always print error tests
+                for (const auto& test : registry_manager.getWithErrorTests()) {
+                    ColoredPrintf(COLOR_PURPLE, "\t\t[%s] [%.6f ms]\n\t\tMessage: %s\n", test.get().getLabel(verbose).c_str(), test.get().getExecTimeMs().count(), test.get().getError().c_str());
+                }
             }
         }
     };
@@ -846,13 +891,15 @@ namespace H2OFastTests {
 //Helper macros to use the unit test suit
 #define register_scenario(ScenarioName) \
     struct ScenarioName : H2OFastTests::RegistryManager<ScenarioName> { \
-        ScenarioName(std::function<bool(void)> feeder); \
+        ScenarioName(std::function<void(void)> feeder); \
         virtual void describe(); \
     }; \
     static ScenarioName ScenarioName ## _registry_manager{ []() { \
-        return H2OFastTests::detail::get_registry().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), H2OFastTests::detail::TestList{}).second; \
+        H2OFastTests::detail::get_registry().getAllTests().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), H2OFastTests::detail::TestList{}); \
+        H2OFastTests::detail::get_registry().getAllSetUps().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), [](){}); \
+        H2OFastTests::detail::get_registry().getAllTearDowns().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), [](){}); \
     } }; \
-    ScenarioName::ScenarioName(std::function<bool(void)> feeder) \
+    ScenarioName::ScenarioName(std::function<void(void)> feeder) \
         : RegistryManager<ScenarioName>{ feeder } { \
         describe(); \
     } \
