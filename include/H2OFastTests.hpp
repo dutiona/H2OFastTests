@@ -440,7 +440,7 @@ namespace H2OFastTests {
         public:
 
             // States of the test
-            enum Status {
+            enum class Status {
                 PASSED,    // test successfuly passed
                 FAILED,    // test failed to pass (an assert failed)
                 ERROR,    // an error occured during the test :
@@ -458,7 +458,7 @@ namespace H2OFastTests {
             Test(const std::string& label)
                 : Test(label, []() {}) {}
             Test(const std::string& label, const TestFunctor&& test)
-                : test_holder_(std::make_unique<TestFunctor>(std::move(test))), label_(label), status_(NONE)
+                : test_holder_(std::make_unique<TestFunctor>(std::move(test))), label_(label), status_(Status::NONE)
             {}
 
             // Copy forbidden
@@ -512,18 +512,18 @@ namespace H2OFastTests {
                 auto start = std::chrono::high_resolution_clock::now();
                 try {
                     (*test_holder_)(); /* /!\ Here is the test call /!\ */
-                    status_ = PASSED;
+                    status_ = Status::PASSED;
                 }
                 catch (const GenericTestFailure& failure) {
-                    status_ = FAILED;
+                    status_ = Status::FAILED;
                     failure_reason_ = failure.what();
                 }
                 catch (const std::exception& e) {
-                    status_ = ERROR;
+                    status_ = Status::ERROR;
                     error_ = e.what();
                 }
                 catch (...) {
-                    status_ = ERROR;
+                    status_ = Status::ERROR;
                     error_ = "Unkown error";
                 }
                 exec_time_ms_ = std::chrono::high_resolution_clock::now() - start;
@@ -596,7 +596,7 @@ namespace H2OFastTests {
         protected:
 
             // Put state to skipped and don't run the test
-            virtual void run_private() override { status_ = SKIPPED; }
+            virtual void run_private() override { status_ = Test::Status::SKIPPED; }
         };
 
         // Helper functions to build/skip a test case
@@ -607,25 +607,18 @@ namespace H2OFastTests {
         std::unique_ptr<Test> make_skipped_test(const std::string& reason, const std::string& label, TestFunctor&& func) { return std::make_unique<SkippedTest>(reason, label, std::move(func)); }
 
         // POD containing informations about a test
-        struct TestInfo {
-            using Status = Test::Status;
-
-            TestInfo(const Test& t) : test(t) {}
-            TestInfo& operator=(const TestInfo&) = delete;
-
-            const Test& test;
-        };
+        using TestInfo = std::reference_wrapper<const Test>;
 
         // Interface for making an observer
         class IRegistryObserver {
         public:
-            virtual void update(const TestInfo& infos) const = 0;
+            virtual void update(TestInfo infos) const = 0;
         };
 
         // Implementation of the observable part of the DP observer
         class IRegistryObservable {
         public:
-            void notify(const TestInfo& infos) const {
+            void notify(TestInfo infos) const {
                 for (auto& observer : list_observers_) {
                     observer->update(infos);
                 }
@@ -780,6 +773,7 @@ namespace H2OFastTests {
     // Public accessible types
     using detail::LineInfo;
     using detail::TestInfo;
+    using detail::Test;
     using detail::RegistryStorage;
     using detail::IRegistryObserver;
     template<class ScenarioName>
@@ -852,26 +846,26 @@ namespace H2OFastTests {
 
     // Observer impl example
     class ConsoleIO_Observer : public IRegistryObserver {
-        virtual void update(const TestInfo& infos) const override {
-            std::cout << (infos.test.getStatus() == TestInfo::Status::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
-                << infos.test.getLabel(false) << "] [" << infos.test.getExecTimeMs().count() << "ms]:" << std::endl
-                << "Status: " << infos.test.getStatus() << std::endl;
+        virtual void update(TestInfo infos) const override {
+            std::cout << (infos.get().getStatus() == Test::Status::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
+                << infos.get().getLabel(false) << "] [" << infos.get().getExecTimeMs().count() << "ms]:" << std::endl
+                << "Status: " << infos.get().getStatus() << std::endl;
         }
     };
 }
 
 //Helper macros to use the unit test suit
 #define register_scenario(ScenarioName) \
-    struct ScenarioName : H2OFastTests::RegistryManager<ScenarioName> { \
-        ScenarioName(H2OFastTests::RegistryManager<ScenarioName>::FeederFunctor feeder); \
+    struct ScenarioName : H2OFastTests::template RegistryManager<ScenarioName> { \
+        ScenarioName(H2OFastTests::template RegistryManager<ScenarioName>::FeederFunctor feeder); \
         virtual void describe(); \
     }; \
     static ScenarioName ScenarioName ## _registry_manager{ []() { \
-        H2OFastTests::detail::get_registry().getAllTests().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), H2OFastTests::detail::TestList{}); \
-        H2OFastTests::detail::get_registry().getAllSetUps().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), [](){}); \
-        H2OFastTests::detail::get_registry().getAllTearDowns().emplace(H2OFastTests::detail::type_helper<ScenarioName>::type_index(), [](){}); \
+        H2OFastTests::detail::get_registry().getAllTests().emplace(H2OFastTests::detail::template type_helper<ScenarioName>::type_index(), H2OFastTests::detail::TestList{}); \
+        H2OFastTests::detail::get_registry().getAllSetUps().emplace(H2OFastTests::detail::template type_helper<ScenarioName>::type_index(), [](){}); \
+        H2OFastTests::detail::get_registry().getAllTearDowns().emplace(H2OFastTests::detail::template type_helper<ScenarioName>::type_index(), [](){}); \
     } }; \
-    ScenarioName::ScenarioName(H2OFastTests::RegistryManager<ScenarioName>::FeederFunctor feeder) \
+    ScenarioName::ScenarioName(H2OFastTests::template RegistryManager<ScenarioName>::FeederFunctor feeder) \
         : RegistryManager<ScenarioName>{ feeder } { \
         describe(); \
     } \
@@ -880,7 +874,10 @@ namespace H2OFastTests {
 #define run_scenario(ScenarioName) \
     ScenarioName ## _registry_manager.run_tests();
 
-#define register_observer(ScenarioName, class_name, instance_ptr) \
+#define register_observer(ScenarioName, class_name) \
+    ScenarioName ## _registry_manager.addObserver(std::make_shared<class_name>())
+
+#define register_custom_observer(ScenarioName, class_name, instance_ptr) \
     ScenarioName ## _registry_manager.addObserver(std::shared_ptr<class_name>(instance_ptr))
 
 #define print_result_verbose(ScenarioName) \
