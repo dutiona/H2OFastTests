@@ -458,7 +458,7 @@ namespace H2OFastTests {
             Test(const std::string& label)
                 : Test(label, []() {}) {}
             Test(const std::string& label, const TestFunctor&& test)
-                : test_holder_(make_unique<TestFunctor>(std::move(test))), label_(label), status_(NONE)
+                : test_holder_(std::make_unique<TestFunctor>(std::move(test))), label_(label), status_(NONE)
             {}
 
             // Copy forbidden
@@ -600,11 +600,11 @@ namespace H2OFastTests {
         };
 
         // Helper functions to build/skip a test case
-        std::unique_ptr<Test> make_test(TestFunctor&& func) { return make_unique<Test>(std::move(func)); }
-        std::unique_ptr<Test> make_test(const std::string& label, TestFunctor&& func) { return make_unique<Test>(label, std::move(func)); }
-        std::unique_ptr<Test> make_skipped_test(TestFunctor&& test) { return make_unique<SkippedTest>(std::move(test)); }
-        std::unique_ptr<Test> make_skipped_test(const std::string& label, TestFunctor&& func) { return make_unique<SkippedTest>(label, std::move(func)); }
-        std::unique_ptr<Test> make_skipped_test(const std::string& reason, const std::string& label, TestFunctor&& func) { return make_unique<SkippedTest>(reason, label, std::move(func)); }
+        std::unique_ptr<Test> make_test(TestFunctor&& func) { return std::make_unique<Test>(std::move(func)); }
+        std::unique_ptr<Test> make_test(const std::string& label, TestFunctor&& func) { return std::make_unique<Test>(label, std::move(func)); }
+        std::unique_ptr<Test> make_skipped_test(TestFunctor&& test) { return std::make_unique<SkippedTest>(std::move(test)); }
+        std::unique_ptr<Test> make_skipped_test(const std::string& label, TestFunctor&& func) { return std::make_unique<SkippedTest>(label, std::move(func)); }
+        std::unique_ptr<Test> make_skipped_test(const std::string& reason, const std::string& label, TestFunctor&& func) { return std::make_unique<SkippedTest>(reason, label, std::move(func)); }
 
         // POD containing informations about a test
         struct TestInfo {
