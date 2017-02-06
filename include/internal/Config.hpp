@@ -16,7 +16,7 @@
 #include <iostream>
 #include <string>
 
-// Determines the platform on which Google Test is compiled.
+ // Determines the platform on which Google Test is compiled.
 #ifdef __CYGWIN__
 # define H2OFT_OS_CYGWIN 1
 #elif defined __SYMBIAN32__
@@ -294,7 +294,7 @@ bool ShouldUseColor(bool stdout_is_tty) {
         const std::string term = std::string{ buffer };
 #       define FREE_BUFFER free(buffer);
 #   endif
-        
+
         // On non-Windows platforms, we rely on the TERM variable.
         const bool term_supports_color =
             term == "xterm" ||
@@ -308,14 +308,14 @@ bool ShouldUseColor(bool stdout_is_tty) {
             term == "rxvt-unicode-256color" ||
             term == "linux" ||
             term == "cygwin";
-        
+
 #       ifdef FREE_BUFFER
         FREE_BUFFER
 #       undef FREE_BUFFER
 #       endif
 
 
-        return stdout_is_tty && term_supports_color;
+            return stdout_is_tty && term_supports_color;
 #   endif  // H2OFT_OS_WINDOWS
     }
 

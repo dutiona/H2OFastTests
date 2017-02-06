@@ -1,7 +1,6 @@
 set(
 	source_files_headers
 	../include/H2OFastTests.hpp
-    ../include/H2OFastTests_config.hpp
 )
 
 set(
