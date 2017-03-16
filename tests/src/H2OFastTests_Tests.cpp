@@ -145,48 +145,11 @@ register_scenario(H2OFastTests_Tests)
 }
 
 
-//int main(int /*argc*/, char** /*argv*/) {
-//    register_observer(H2OFastTests_Tests, H2OFastTests::ConsoleIO_Observer);
-//    run_scenario(H2OFastTests_Tests);
-//    //print_result_verbose(H2OFastTests_Tests);
-//
-//    std::cout << "Press enter to continue...";
-//    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-//}
+int main(int /*argc*/, char** /*argv*/) {
+    register_observer(H2OFastTests_Tests, H2OFastTests::ConsoleIO_Observer);
+    run_scenario(H2OFastTests_Tests);
+    //print_result_verbose(H2OFastTests_Tests);
 
-
-
-int foo(double, double, float, long) {
-    std::cout << "int foo(double, double, float, long)" << std::endl;
-    return 0;
-}
-
-class Foo {
-public:
-    Foo() {}
-
-    char bar(long, double, int) {
-        std::cout << "chat Foo::bar(long, double, int)" << std::endl;
-        return 'c';
-    }
-
-    static void hey(long) {
-        std::cout << "void Foo::hey(long)" << std::endl;
-    }
-};
-
-
-int main() {
-
-    auto d_foo = decorate<int(double, double, float, long)>::from(foo);
-    d_foo(0., 0., 0.f, 0l);
-
-    Foo f;
-    auto d_foo_bar = decorate<char(long, double, int)>::from<Foo, &Foo::bar>(&f);
-    d_foo_bar(0l, 0., 0);
-
-    auto d_foo_hey = decorate<void(long)>::from(Foo::hey);
-    d_foo_hey(0l);
-
-    return 0;
+    std::cout << "Press enter to continue...";
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 }

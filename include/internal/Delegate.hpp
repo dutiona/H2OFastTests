@@ -177,7 +177,7 @@ private:
     using deleter_type = void(*) (void*);
 
     void* object_ptr_;
-    stub_ptr_type stub_ptr_{};
+    stub_ptr_type stub_ptr_;
 
     deleter_type deleter_;
 

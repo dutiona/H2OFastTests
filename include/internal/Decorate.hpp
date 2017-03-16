@@ -12,7 +12,7 @@ class decorate<ReturnType(ArgumentType...)> : public delegate<ReturnType(Argumen
 public:
 
     template<class ... Args>
-    decorate(Args&& ... args) : delegate(std::forward<Args>(args)...) {}
+    decorate(Args&& ... args) : delegate<ReturnType(ArgumentType...)>(std::forward<Args>(args)...) {}
 
     ReturnType operator()(ArgumentType&& ... args) const override {
 
@@ -29,7 +29,7 @@ public:
 
     template <class ClassType, ReturnType(ClassType::* const method_ptr)(ArgumentType...)>
     static decorate from(ClassType* const object_ptr) noexcept {
-        return delegate<ReturnType(ArgumentType...)>::from<ClassType, method_ptr>(object_ptr);
+        return delegate<ReturnType(ArgumentType...)>::template from<ClassType, method_ptr>(object_ptr);
     }
 
     template <class ClassType, ReturnType(ClassType::* const method_ptr)(ArgumentType...) const>
@@ -53,7 +53,7 @@ public:
     }
 
     static decorate from(ReturnType(*const function_ptr)(ArgumentType...)) {
-        return delegate{ function_ptr };
+        return delegate<ReturnType(ArgumentType...)>{ function_ptr };
     }
 
     template <class ClassType>
@@ -82,7 +82,7 @@ class decorate<void(ArgumentType...)> : public delegate<void(ArgumentType...)> {
 public:
 
     template<class ... Args>
-    decorate(Args&& ... args) : delegate(std::forward<Args>(args)...) {}
+    decorate(Args&& ... args) : delegate<void(ArgumentType...)>(std::forward<Args>(args)...) {}
 
     void operator()(ArgumentType&& ... args) const override {
 
@@ -122,7 +122,7 @@ public:
     }
 
     static decorate from(void(*const function_ptr)(ArgumentType...)) {
-        return delegate{ function_ptr };
+        return delegate<void(ArgumentType...)>{ function_ptr };
     }
 
     template <class ClassType>
