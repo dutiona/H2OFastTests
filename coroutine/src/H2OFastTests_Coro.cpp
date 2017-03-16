@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cinttypes>
 #include <csignal>
+#include <csetjmp>
 #include <Windows.h>
 
 
@@ -36,9 +37,76 @@ task<void> print_fib(int n) {
    co_return;
 }
 
-int main() {
 
-   print_fib<uint64_t>(90).get();
+std::jmp_buf jump_buffer;
+
+
+void signal_cb(int sig_num) {
+   switch (sig_num) {
+   case SIGINT: {
+      std::cout << "SIGINT" << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+   case SIGILL: {
+      std::cout << "SIGILL" << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+   case SIGFPE: {
+      std::cout << "SIGFPE" << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+   case SIGSEGV: {
+      std::cout << "SIGSEGV" << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+   case SIGTERM: {
+      std::cout << "SIGTERM" << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+   case SIGBREAK: {
+      std::cout << "SIGBREAK" << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+   case SIGABRT: {
+      std::cout << "SIGABRT" << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+   default: {
+      std::cout << "default " << sig_num << std::endl;
+      std::longjmp(jump_buffer, sig_num);
+      break;
+   }
+
+   }
+}
+
+int main() {
+   //print_fib<uint64_t>(90).get();
+
+   signal(SIGINT, signal_cb);
+   signal(SIGILL, signal_cb);
+   signal(SIGFPE, signal_cb);
+   signal(SIGSEGV, signal_cb);
+   signal(SIGTERM, signal_cb);
+   signal(SIGBREAK, signal_cb);
+   signal(SIGABRT, signal_cb);
+   volatile int sig_num = 0;
+
+   if ((sig_num = std::setjmp(jump_buffer)) != 0) {
+      std::cout << "CRASH" << std::endl;
+      std::cout << sig_num << std::endl;
+      return 1;
+   }
+
+   
+   raise(SIGSEGV);
 
    return 0;
 }
