@@ -20,6 +20,7 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-long-long -pedantic")
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /await")
 
 set(
 	source_files
@@ -30,8 +31,7 @@ set(
 source_group(
 	"Headers"
 	FILES
-	include/H2OFastTests.hpp
-    include/H2OFastTests_config.hpp
+	$(source_files)
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -40,9 +40,8 @@ add_library(H2OFastTests STATIC ${source_files})
 set_target_properties(H2OFastTests PROPERTIES LINKER_LANGUAGE CXX)
 
 add_subdirectory(tests)
+add_subdirectory(coroutine)
 
 # add the install targets
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/H2OFastTests.hpp
-         DESTINATION H2OFastTests)
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/H2OFastTests_config.hpp
+install (FILES $(source_files)
          DESTINATION H2OFastTests)
