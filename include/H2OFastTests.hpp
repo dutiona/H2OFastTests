@@ -37,18 +37,18 @@ namespace detail {
     template<class Type>
     struct type_helper {
         using type = Type;
-        static bool before(const std::type_info& rhs) { return typeid(Type).before(rhs); }
-        static const char*                       raw_name() { return typeid(Type).raw_name(); }
-        static const char*                       name() { return typeid(Type).name(); }
-        static size_t                            hash_code() { return typeid(Type).hash_code(); }
-        static std::type_index                   type_index() { return std::type_index(typeid(Type)); }
+        static bool            before(const std::type_info& rhs) { return typeid(Type).before(rhs); }
+        static const char*     raw_name() { return typeid(Type).raw_name(); }
+        static const char*     name() { return typeid(Type).name(); }
+        static size_t          hash_code() { return typeid(Type).hash_code(); }
+        static std::type_index type_index() { return std::type_index(typeid(Type)); }
     };
 
     // Line info struct
     // Holds line number, file name and function name if relevant
     class LineInfo
     {
-        public:
+    public:
         LineInfo() : init_(false) {}
 
         LineInfo(const char* file, const char* func, int line) : file_(file), func_(func), line_(line), init_(true) {}
@@ -63,7 +63,7 @@ namespace detail {
             return os;
         }
 
-        private:
+    private:
         std::string file_;
         std::string func_;
         int         line_;
@@ -81,7 +81,7 @@ namespace detail {
         template<class, class>
         static auto test(...) -> std::false_type;
 
-        public:
+    public:
         static const bool value = decltype(test<S, T>(0))::value;
     };
 
@@ -172,7 +172,7 @@ namespace detail {
     template<class ValueTypeL, class ValueTypeR, class ExceptionType>
     class TestFailure : public GenericTestFailure
     {
-        public:
+    public:
         TestFailure(const std::string& message, ValueTypeL reached, ValueTypeR expected, FailureType failure_type)
             : message_(message), reached_(reached), expected_(expected), failure_type_(failure_type) {}
 
@@ -186,7 +186,7 @@ namespace detail {
 
         TestFailure& operator=(const TestFailure&) = delete;
 
-        private:
+    private:
         mutable std::string message_;
         const ValueTypeL    reached_;
         const ValueTypeR    expected_;
@@ -214,7 +214,7 @@ namespace detail {
     template<class Expr>
     class AsserterExpression
     {
-        public:
+    public:
         using EmptyExpression = AsserterExpression<std::nullptr_t>;
 
         AsserterExpression() : expr_(nullptr) {}
@@ -389,7 +389,7 @@ namespace detail {
             return {};
         }
 
-        private:
+    private:
         // Lower case function
         void tolower_internal(std::string& s) {
             std::transform(s.begin(), s.end(), s.begin(),
@@ -420,7 +420,7 @@ namespace detail {
     // Standard class discribing a test
     class Test
     {
-        public:
+    public:
         // States of the test
         enum class Status {
             PASSED, // test successfuly passed
@@ -466,13 +466,13 @@ namespace detail {
 
         // Information getters
         const std::string& getLabel(bool verbose) const { return getLabel_private(verbose); }
-        const std::string&               getFailureReason() const { return getFailureReason_private(); }
-        const std::string&               getSkippedReason() const { return getSkippedReason_private(); }
-        const std::string&               getError() const { return getError_private(); }
-        Duration                         getExecTimeMs() const { return getExecTimeMs_private(); }
-        Status                           getStatus() const { return getStatus_private(); }
+        const std::string& getFailureReason() const { return getFailureReason_private(); }
+        const std::string& getSkippedReason() const { return getSkippedReason_private(); }
+        const std::string& getError() const { return getError_private(); }
+        Duration           getExecTimeMs() const { return getExecTimeMs_private(); }
+        Status             getStatus() const { return getStatus_private(); }
 
-        protected:
+    protected:
         // Called by RegistryManager
         void run(const SetUpFunctor& setup, const TearDownFunctor& teardown) {
             setup();
@@ -510,7 +510,7 @@ namespace detail {
         virtual Duration           getExecTimeMs_private() const { return exec_time_ms_; }
         virtual Status             getStatus_private() const { return status_; }
 
-        protected:
+    protected:
         Duration                     exec_time_ms_;
         std::unique_ptr<TestFunctor> test_holder_;
         std::string                  label_;
@@ -544,7 +544,7 @@ namespace detail {
     // This class wrap a test and make it so it's skipped (never run)
     class SkippedTest : public Test
     {
-        public:
+    public:
         SkippedTest(TestFunctor&& func) : Test{std::move(func)} {}
         SkippedTest(const std::string& label, TestFunctor&& func) : Test{label, std::move(func)} {}
         SkippedTest(const std::string& reason, const std::string& label, TestFunctor&& func)
@@ -552,7 +552,7 @@ namespace detail {
             skipped_reason_ = reason;
         }
 
-        protected:
+    protected:
         // Put state to skipped and don't run the test
         virtual void run_private() override { status_ = Test::Status::SKIPPED; }
     };
@@ -578,21 +578,21 @@ namespace detail {
     // Interface for making an observer
     class IRegistryObserver
     {
-        public:
+    public:
         virtual void update(TestInfo infos) const = 0;
     };
 
     // Implementation of the observable part of the DP observer
     class IRegistryObservable
     {
-        public:
+    public:
         void notify(TestInfo infos) const {
             for (auto& observer : list_observers_) { observer->update(infos); }
         }
         void addObserver(const std::shared_ptr<IRegistryObserver>& observer) { list_observers_.insert(observer); }
         void removeObserver(const std::shared_ptr<IRegistryObserver>& observer) { list_observers_.erase(observer); }
 
-        private:
+    private:
         std::set<std::shared_ptr<IRegistryObserver>> list_observers_;
     };
 
@@ -604,7 +604,7 @@ namespace detail {
 
     class RegistryStorage
     {
-        public:
+    public:
         TestList& getTests(std::type_index index) { return getAllTests()[index]; }
         SetUpFunctor& getSetUp(std::type_index index) { return getAllSetUps()[index]; }
         TearDownFunctor& getTearDown(std::type_index index) { return getAllTearDowns()[index]; }
@@ -613,7 +613,7 @@ namespace detail {
         SetUpStorage& getAllSetUps() { return setups_; }
         SetUpStorage& getAllTearDowns() { return teardowns_; }
 
-        private:
+    private:
         TestStorage     tests_;
         SetUpStorage    setups_;
         TearDownStorage teardowns_;
@@ -628,7 +628,7 @@ namespace detail {
     template<class ScenarioName>
     class RegistryManager : public IRegistryObservable
     {
-        public:
+    public:
         using FeederFunctor = std::function<void(void)>;
 
         RegistryManager(FeederFunctor feeder) : run_(false), exec_time_ms_accumulator_(Duration{0}) { feeder(); }
@@ -718,7 +718,7 @@ namespace detail {
         const TestList& getAllTests() const { return get_registry().getTests(type_helper<ScenarioName>::type_index()); }
         Duration        getAllTestsExecTimeMs() const { return run_ ? exec_time_ms_accumulator_ : Duration{0}; }
 
-        private:
+    private:
         bool                                            run_;
         Duration                                        exec_time_ms_accumulator_;
         std::vector<std::reference_wrapper<const Test>> tests_passed_;
@@ -754,22 +754,21 @@ namespace Asserter {
 template<class ScenarioName>
 class IRegistryTraversal
 {
-    public:
+public:
     IRegistryTraversal(const RegistryManager<ScenarioName>& registry) : registry_(registry) {}
     virtual ~IRegistryTraversal() {}
 
-    protected:
+protected:
     const RegistryManager<ScenarioName>& getRegistryManager() const { return registry_; }
 
-    private:
+private:
     RegistryManager<ScenarioName> registry_;
 };
 
 // Trivial impl for console display results
 template<class ScenarioName>
-class RegistryTraversal_ConsoleIO : private IRegistryTraversal<ScenarioName>
+struct RegistryTraversal_ConsoleIO : private IRegistryTraversal<ScenarioName>
 {
-    public:
     RegistryTraversal_ConsoleIO(const RegistryManager<ScenarioName>& registry)
         : IRegistryTraversal<ScenarioName>(registry) {}
     void print(bool verbose) const {
@@ -826,7 +825,7 @@ class RegistryTraversal_ConsoleIO : private IRegistryTraversal<ScenarioName>
 };
 
 // Observer impl example
-class ConsoleIO_Observer : public IRegistryObserver
+struct ConsoleIO_Observer : public IRegistryObserver
 {
     virtual void update(TestInfo infos) const override {
         std::cout << (infos.get().getStatus() == Test::Status::SKIPPED ? "SKIPPING TEST [" : "RUNNING TEST [")
